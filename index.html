@@ -73,8 +73,16 @@ form input,form select,form textarea{width:100%;font:inherit;padding:8px 10px;bo
   <div class="cat-sum" id="chips"></div>
   <div class="bar">
     <input id="q" type="search" placeholder="Pesquisar (cliente, fornecedor, local, conta…)">
-    <select id="fEst"><option value="">Todos os estados</option><option value="ativo">Ativos</option><option value="cancelar">A cancelar</option><option value="cancelado">Cancelados</option></select>
-    <select id="fPag"><option value="">Todas as formas de pagamento</option></select>
+    <button id="bClr" class="sm" type="button">Limpar filtros</button>
+  </div>
+  <div class="bar">
+    <select id="fCli"><option value="">Empresa / cliente: todos</option></select>
+    <select id="fFor"><option value="">Fornecedor: todos</option></select>
+    <select id="fCat"><option value="">Categoria: todas</option></select>
+    <select id="fPer"><option value="">Tipo: mensal e anual</option><option value="1">Mensal</option><option value="2">Bimestral</option><option value="3">Trimestral</option><option value="6">Semestral</option><option value="12">Anual</option></select>
+    <select id="fFid"><option value="">Fidelização: todas</option><option value="sem">Sem fidelização</option><option value="com">Com fidelização</option></select>
+    <select id="fEst"><option value="">Estado: todos</option><option value="ativo">Ativos</option><option value="cancelar">A cancelar</option><option value="cancelado">Cancelados</option></select>
+    <select id="fPag"><option value="">Pagamento: todos</option></select>
   </div>
   <div class="tw"><table>
     <thead><tr id="thead"></tr></thead>
@@ -144,7 +152,7 @@ form input,form select,form textarea{width:100%;font:inherit;padding:8px 10px;bo
 <div id="toast"></div>
 
 <script>
-const CATS=["Telecomunicações","Alarmes / Segurança","Seguros","Eletricidade","Água","Gás","Software / Online","Outro"];
+const CATS=["Telecomunicações","Pacote completo (net + TV + voz)","Alarmes / Segurança","Seguros","Luz","Água","Gás","Software / Online","Outro"];
 const PAGS=["Débito direto","Cartão de crédito","Cartão de débito","Transferência bancária","Referência Multibanco","Numerário","Outra"];
 const $=id=>document.getElementById(id);
 const eur=n=>new Intl.NumberFormat("pt-PT",{style:"currency",currency:"EUR"}).format(n||0);
@@ -153,7 +161,7 @@ const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&g
 let items=[],col=null,editing=null,sortK="renov",sortD=1,catF="",persist=false;
 
 CATS.forEach(c=>$("categoria").insertAdjacentHTML("beforeend",`<option>${c}</option>`));
-PAGS.forEach(c=>{$("pag").insertAdjacentHTML("beforeend",`<option>${c}</option>`);$("fPag").insertAdjacentHTML("beforeend",`<option>${c}</option>`)});
+PAGS.forEach(c=>$("pag").insertAdjacentHTML("beforeend",`<option>${c}</option>`));
 
 function mensal(i){return (Number(i.valor)||0)/(Number(i.period)||1)}
 function dias(s){if(!s)return null;const t=new Date();t.setHours(0,0,0,0);return Math.round((new Date(s+"T00:00:00")-t)/864e5)}
@@ -170,22 +178,32 @@ $("thead").innerHTML=COLS.map(([k,l])=>`<th data-k="${k}">${l}</th>`).join("");
 $("thead").onclick=e=>{const k=e.target.dataset?.k;if(!k)return;sortD=sortK===k?-sortD:1;sortK=k;render()};
 
 function filtered(){
-  const q=$("q").value.toLowerCase(),e=$("fEst").value,p=$("fPag").value;
-  return items.filter(i=>(!catF||i.categoria===catF)&&(!e||i.estado===e)&&(!p||i.pag===p)&&
+  const q=$("q").value.toLowerCase(),e=$("fEst").value,p=$("fPag").value,cl=$("fCli").value,fo=$("fFor").value,pe=$("fPer").value,fi=$("fFid").value;
+  const hoje=new Date().toISOString().slice(0,10);
+  return items.filter(i=>(!catF||i.categoria===catF)&&(!e||i.estado===e)&&(!p||i.pag===p)&&(!cl||i.cliente===cl)&&(!fo||i.fornecedor===fo)&&(!pe||String(i.period)===pe)&&
+    (!fi||(fi==="com"?(i.fidel&&i.fidel>=hoje):!(i.fidel&&i.fidel>=hoje)))&&
     (!q||[i.fornecedor,i.servico,i.cliente,i.local,i.origem,i.contrato,i.notas,i.categoria].join(" ").toLowerCase().includes(q)));
 }
+function fillSel(id,vals){
+  const el=$(id),cur=el.value,first=el.options[0].outerHTML;
+  el.innerHTML=first+[...new Set(vals.filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt")).map(v=>`<option>${esc(v)}</option>`).join("");
+  el.value=[...el.options].some(o=>o.value===cur)?cur:"";
+}
 function render(){
-  const act=items.filter(i=>i.estado!=="cancelado");
+  fillSel("fCli",items.map(i=>i.cliente));fillSel("fFor",items.map(i=>i.fornecedor));fillSel("fCat",items.map(i=>i.categoria));fillSel("fPag",items.map(i=>i.pag));
+  $("fCat").value=catF;
+  const all=items.filter(i=>i.estado!=="cancelado");
+  const act=filtered().filter(i=>i.estado!=="cancelado");
   const m=act.reduce((s,i)=>s+mensal(i),0);
   const prox=act.filter(i=>{const d=dias(proxima(i));return d!==null&&d<=30});
   const aviso=act.filter(i=>{const d=dias(proxima(i));return d!==null&&i.aviso&&d<=Number(i.aviso)+7&&d>=0});
   $("kpis").innerHTML=
-   `<div class="kpi"><div class="l">Subscrições ativas</div><div class="v">${act.length}</div></div>
+   `<div class="kpi"><div class="l">Subscrições ativas (na vista)</div><div class="v">${act.length}</div></div>
     <div class="kpi"><div class="l">Custo mensal (equivalente)</div><div class="v">${eur(m)}</div></div>
     <div class="kpi"><div class="l">Custo anual</div><div class="v">${eur(m*12)}</div></div>
     <div class="kpi"><div class="l">Renovam nos próx. 30 dias</div><div class="v">${prox.length}</div><div class="sub">${eur(prox.reduce((s,i)=>s+Number(i.valor||0),0))} a pagar</div></div>
     <div class="kpi"><div class="l">⚠ Janela de cancelamento</div><div class="v">${aviso.length}</div><div class="sub">renovam dentro do aviso prévio</div></div>`;
-  const cats={};act.forEach(i=>cats[i.categoria]=(cats[i.categoria]||0)+mensal(i));
+  const cats={};all.forEach(i=>cats[i.categoria]=(cats[i.categoria]||0)+mensal(i));
   $("chips").innerHTML=`<span class="chip ${catF?"":"on"}" data-c="">Todas</span>`+Object.keys(cats).map(c=>`<span class="chip ${catF===c?"on":""}" data-c="${esc(c)}">${esc(c)} · ${eur(cats[c])}/mês</span>`).join("");
   $("chips").onclick=e=>{if(e.target.dataset.c!==undefined){catF=e.target.dataset.c;render()}};
   const rows=filtered().sort((a,b)=>{
@@ -207,7 +225,9 @@ function render(){
   const used=[...new Set(items.map(i=>i.pag))];
 }
 $("tb").onclick=e=>{const tr=e.target.closest("tr");if(tr)openDlg(items.find(i=>i.id===tr.dataset.id))};
-["q","fEst","fPag"].forEach(id=>$(id).oninput=render);
+["q","fEst","fPag","fCli","fFor","fPer","fFid"].forEach(id=>$(id).oninput=render);
+$("fCat").oninput=()=>{catF=$("fCat").value;render()};
+$("bClr").onclick=()=>{["q","fEst","fPag","fCli","fFor","fPer","fFid"].forEach(id=>$(id).value="");catF="";render()};
 
 const F=["categoria","fornecedor","servico","cliente","local","contrato","valor","period","iva","pag","origem","renov","aviso","fidel","estado","notas"];
 var openDlg=function(it){
