@@ -111,6 +111,14 @@ form input,form select,form textarea{width:100%;font:inherit;padding:8px 10px;bo
     <div><label>Aviso prévio para cancelar (dias)</label><input id="aviso" type="number" min="0" step="1" placeholder="Ex.: 30"></div>
     <div><label>Fim da fidelização</label><input id="fidel" type="date"></div>
     <div><label>Estado</label><select id="estado"><option value="ativo">Ativo</option><option value="cancelar">A cancelar</option><option value="cancelado">Cancelado</option></select></div>
+    <div id="w_potencia" data-cats="Eletricidade"><label>Potência contratada (kVA)</label><input id="potencia" type="number" step="0.01" min="0"></div>
+    <div id="w_tarifa" data-cats="Eletricidade"><label>Tarifa</label><select id="tarifa"><option value=""></option><option>Simples</option><option>Bi-horária</option><option>Tri-horária</option><option>Outra</option></select></div>
+    <div id="w_consumo" data-cats="Eletricidade|Gás|Água"><label>Consumo médio mensal (kWh ou m³)</label><input id="consumo" type="number" step="0.01" min="0"></div>
+    <div id="w_preco_un" data-cats="Eletricidade|Gás|Água"><label>Preço por kWh ou m³ (€)</label><input id="preco_un" type="number" step="0.0001" min="0"></div>
+    <div id="w_velocidade" data-cats="Telecomunicações|Pacote completo (net + TV + voz)"><label>Velocidade internet</label><input id="velocidade" placeholder="Ex.: 1 Gb, 500 Mb"></div>
+    <div id="w_canais" data-cats="Telecomunicações|Pacote completo (net + TV + voz)"><label>Canais / linhas / telemóveis</label><input id="canais" placeholder="Ex.: 160 canais, 2 telemóveis"></div>
+    <div id="w_capital" data-cats="Seguros"><label>Capital seguro (€)</label><input id="capital" type="number" step="0.01" min="0"></div>
+    <div id="w_franquia" data-cats="Seguros"><label>Franquia (€)</label><input id="franquia" type="number" step="0.01" min="0"></div>
     <div class="f"><label>Notas</label><textarea id="notas" rows="2" placeholder="Contactos, condições, cláusulas, etc."></textarea></div>
   </div>
   <div id="docBox" style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
@@ -172,6 +180,15 @@ let items=[],col=null,editing=null,sortK="renov",sortD=1,catF="",persist=false;
 CATS.forEach(c=>$("categoria").insertAdjacentHTML("beforeend",`<option>${c}</option>`));
 PAGS.forEach(c=>$("pag").insertAdjacentHTML("beforeend",`<option>${c}</option>`));
 
+function det(i){
+  const p=[];const n=(v,u)=>new Intl.NumberFormat("pt-PT").format(v)+(u?" "+u:"");
+  if(i.potencia!=="")p.push(n(i.potencia,"kVA"));if(i.tarifa)p.push(esc(i.tarifa));
+  if(i.consumo!=="")p.push(n(i.consumo,(i.categoria==="Eletricidade"?"kWh":"kWh/m³")+"/mês"));
+  if(i.preco_un!=="")p.push(Number(i.preco_un).toLocaleString("pt-PT",{minimumFractionDigits:4})+" €/un.");
+  if(i.velocidade)p.push(esc(i.velocidade));if(i.canais)p.push(esc(i.canais));
+  if(i.capital!=="")p.push("capital "+eur(i.capital));if(i.franquia!=="")p.push("franquia "+eur(i.franquia));
+  return p.join(" · ");
+}
 function mensal(i){return (Number(i.valor)||0)/(Number(i.period)||1)}
 function dias(s){if(!s)return null;const t=new Date();t.setHours(0,0,0,0);return Math.round((new Date(s+"T00:00:00")-t)/864e5)}
 // avança a data de renovação para a próxima ocorrência se já passou
@@ -210,10 +227,11 @@ function render(){
    `<div class="kpi"><div class="l">Subscrições ativas (na vista)</div><div class="v">${act.length}</div></div>
     <div class="kpi"><div class="l">Custo mensal (equivalente)</div><div class="v">${eur(m)}</div></div>
     <div class="kpi"><div class="l">Custo anual</div><div class="v">${eur(m*12)}</div></div>
+    <div class="kpi"><div class="l">Preço médio por subscrição</div><div class="v">${eur(act.length?m/act.length:0)}</div><div class="sub">por mês</div></div>
     <div class="kpi"><div class="l">Renovam nos próx. 30 dias</div><div class="v">${prox.length}</div><div class="sub">${eur(prox.reduce((s,i)=>s+Number(i.valor||0),0))} a pagar</div></div>
     <div class="kpi"><div class="l">⚠ Janela de cancelamento</div><div class="v">${aviso.length}</div><div class="sub">renovam dentro do aviso prévio</div></div>`;
-  const cats={};all.forEach(i=>cats[i.categoria]=(cats[i.categoria]||0)+mensal(i));
-  $("chips").innerHTML=`<span class="chip ${catF?"":"on"}" data-c="">Todas</span>`+Object.keys(cats).map(c=>`<span class="chip ${catF===c?"on":""}" data-c="${esc(c)}">${esc(c)} · ${eur(cats[c])}/mês</span>`).join("");
+  const cats={},cnt={};all.forEach(i=>{cats[i.categoria]=(cats[i.categoria]||0)+mensal(i);cnt[i.categoria]=(cnt[i.categoria]||0)+1});
+  $("chips").innerHTML=`<span class="chip ${catF?"":"on"}" data-c="">Todas</span>`+Object.keys(cats).map(c=>`<span class="chip ${catF===c?"on":""}" data-c="${esc(c)}">${esc(c)} · ${cnt[c]} · média ${eur(cats[c]/cnt[c])}/mês</span>`).join("");
   $("chips").onclick=e=>{if(e.target.dataset.c!==undefined){catF=e.target.dataset.c;render()}};
   const rows=filtered().sort((a,b)=>{
     const f=k=>k==="renov"?proxima(a)&&proxima(b)?proxima(a)<proxima(b)?-1:1:0:(String(a[k]??"").localeCompare(String(b[k]??""),"pt",{numeric:true}));
@@ -225,7 +243,7 @@ function render(){
     const per={1:"mês",2:"bimestre",3:"trimestre",6:"semestre",12:"ano"}[i.period]||"";
     return `<tr data-id="${esc(i.id)}" style="cursor:pointer;${i.estado==="cancelado"?"opacity:.5":""}">
       <td><span class="tag">${esc(i.categoria)}</span></td>
-      <td><b>${esc(i.fornecedor)}</b><div class="sub">${esc(i.servico)}${i.contrato?" · "+esc(i.contrato):""}</div></td>
+      <td><b>${esc(i.fornecedor)}</b><div class="sub">${esc(i.servico)}${i.contrato?" · "+esc(i.contrato):""}</div><div class="sub">${det(i)}</div></td>
       <td>${esc(i.cliente)}</td><td>${esc(i.local)||"—"}</td>
       <td class="n"><b>${eur(i.valor)}</b><div class="sub">/${per}${i.iva==="nao"?" + IVA":""}</div></td>
       <td>${esc(i.pag)}<div class="sub">${esc(i.origem)}</div></td>
@@ -238,7 +256,10 @@ $("tb").onclick=e=>{const tr=e.target.closest("tr");if(tr)openDlg(items.find(i=>
 $("fCat").oninput=()=>{catF=$("fCat").value;render()};
 $("bClr").onclick=()=>{["q","fEst","fPag","fCli","fFor","fPer","fFid"].forEach(id=>$(id).value="");catF="";render()};
 
-const F=["categoria","fornecedor","servico","cliente","local","contrato","valor","period","iva","pag","origem","renov","aviso","fidel","estado","notas"];
+const DET=["potencia","tarifa","consumo","preco_un","velocidade","canais","capital","franquia"];
+const F=["categoria","fornecedor","servico","cliente","local","contrato","valor","period","iva","pag","origem","renov","aviso","fidel","estado","notas",...DET];
+function updDet(){const c=$("categoria").value;DET.forEach(k=>{const w=$("w_"+k);w.style.display=w.dataset.cats.split("|").includes(c)?"":"none"})}
+$("categoria").addEventListener("change",updDet);
 var openDlg=function(it){
   editing=it||null;$("dT").textContent=it?"Editar subscrição":"Nova subscrição";$("bDel").style.display=it?"":"none";
   F.forEach(k=>$(k).value=it?(it[k]??""):(k==="period"?"1":k==="iva"?"sim":k==="estado"?"ativo":""));
@@ -265,8 +286,9 @@ const SB_KEY="sb_publishable_BGznfvhpsndivd64D0IBiA_TdwLZ8wy";
 const sb=supabase.createClient(SB_URL,SB_KEY);
 let papel=null,meEmail="",signup=false,chan=null;
 const canEdit=()=>papel==="admin"||papel==="editor";
-const fromRow=r=>({id:r.id,categoria:r.categoria,fornecedor:r.fornecedor,servico:r.servico||"",cliente:r.cliente,local:r.localizacao||"",contrato:r.contrato||"",valor:Number(r.valor),period:String(r.periodicidade_meses),iva:r.iva_incluido?"sim":"nao",pag:r.forma_pagamento,origem:r.origem_pagamento,renov:r.data_renovacao,aviso:r.aviso_dias??"",fidel:r.fim_fidelizacao||"",estado:r.estado,notas:r.notas||"",por:r.atualizado_por||r.criado_por});
-const toRow=o=>({categoria:o.categoria,fornecedor:o.fornecedor,servico:o.servico||null,cliente:o.cliente,localizacao:o.local||null,contrato:o.contrato||null,valor:o.valor,periodicidade_meses:Number(o.period),iva_incluido:o.iva==="sim",forma_pagamento:o.pag,origem_pagamento:o.origem,data_renovacao:o.renov,aviso_dias:o.aviso===""?null:Number(o.aviso),fim_fidelizacao:o.fidel||null,estado:o.estado,notas:o.notas||null});
+const num=v=>v===""||v==null?null:Number(v);
+const fromRow=r=>({id:r.id,categoria:r.categoria,fornecedor:r.fornecedor,servico:r.servico||"",cliente:r.cliente,local:r.localizacao||"",contrato:r.contrato||"",valor:Number(r.valor),period:String(r.periodicidade_meses),iva:r.iva_incluido?"sim":"nao",pag:r.forma_pagamento,origem:r.origem_pagamento,renov:r.data_renovacao,aviso:r.aviso_dias??"",fidel:r.fim_fidelizacao||"",estado:r.estado,notas:r.notas||"",potencia:r.potencia_kva??"",tarifa:r.tarifa||"",consumo:r.consumo_medio??"",preco_un:r.preco_unitario??"",velocidade:r.velocidade||"",canais:r.canais_linhas||"",capital:r.capital_seguro??"",franquia:r.franquia??"",por:r.atualizado_por||r.criado_por});
+const toRow=o=>({categoria:o.categoria,fornecedor:o.fornecedor,servico:o.servico||null,cliente:o.cliente,localizacao:o.local||null,contrato:o.contrato||null,valor:o.valor,periodicidade_meses:Number(o.period),iva_incluido:o.iva==="sim",forma_pagamento:o.pag,origem_pagamento:o.origem,data_renovacao:o.renov,aviso_dias:o.aviso===""?null:Number(o.aviso),fim_fidelizacao:o.fidel||null,estado:o.estado,notas:o.notas||null,potencia_kva:num(o.potencia),tarifa:o.tarifa||null,consumo_medio:num(o.consumo),preco_unitario:num(o.preco_un),velocidade:o.velocidade||null,canais_linhas:o.canais||null,capital_seguro:num(o.capital),franquia:num(o.franquia)});
 
 async function load(){
   const {data,error}=await sb.from("subscricoes").select("*").order("data_renovacao");
@@ -353,7 +375,7 @@ $("docFile").onchange=async()=>{
   $("docFile").value="";if(ok)toast(ok+" documento(s) anexado(s)");await loadDocs();
 };
 const _open=openDlg;
-openDlg=function(it){_open(it);const ro=!canEdit();[...$("frm").elements].forEach(el=>{if(el.id!=="bCancel")el.disabled=ro});if(ro){$("dT").textContent="Detalhe (só leitura)"}loadDocs()};
+openDlg=function(it){_open(it);const ro=!canEdit();[...$("frm").elements].forEach(el=>{if(el.id!=="bCancel")el.disabled=ro});if(ro){$("dT").textContent="Detalhe (só leitura)"}updDet();loadDocs()};
 $("lf").onsubmit=async e=>{
   e.preventDefault();$("lErr").textContent="";$("lGo").disabled=true;
   const email=$("lEmail").value.trim(),password=$("lPass").value;
