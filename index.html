@@ -24,7 +24,7 @@ button.sm{padding:4px 9px;font-size:13px}
 .bar input,.bar select{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
 .bar input{flex:1;min-width:180px}
 .tw{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:12px}
-table{border-collapse:collapse;width:100%;min-width:860px}
+table{border-collapse:collapse;width:100%}
 th,td{padding:9px 11px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
 th{font-size:12px;color:var(--mut);font-weight:600;cursor:pointer;white-space:nowrap;user-select:none}
 tr:last-child td{border-bottom:0}
@@ -66,16 +66,58 @@ details.sup .in{padding:2px 10px 10px}
 #login .err{color:var(--bad);font-size:13px;min-height:18px;margin-bottom:6px}
 .lnk{background:none;border:0;color:var(--acc);padding:0;text-decoration:underline;font-size:13px}
 #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#111;color:#fff;padding:8px 14px;border-radius:8px;display:none;font-size:13px}
+
+header{padding:22px 20px 6px}
+header .tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button.gh{background:transparent;border-color:transparent;color:var(--mut)}
+button.gh:hover{background:var(--card);border-color:var(--line);color:var(--ink)}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.kpi .v{font-size:24px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+.chip{padding:5px 12px;font-size:13px}
+.chip b{font-weight:650}
+.chip .c{color:var(--mut);margin-left:4px;font-size:12px}
+.chip.on .c{color:#ffffffcc}
+.catsum{font-size:13.5px;color:var(--mut);margin:-4px 0 12px}
+.catsum b{color:var(--ink)}
+.bar{margin-bottom:10px;align-items:center}
+.bar select{max-width:100%}
+#more{padding:10px;background:var(--card);border:1px dashed var(--line);border-radius:10px}
+tr.r{cursor:pointer}
+tr.r:hover td{background:color-mix(in srgb,var(--acc) 5%,transparent)}
+tr.r.cx{opacity:.5}
+.badge{display:inline-block;font-size:12px;padding:1px 8px;border-radius:99px;margin-top:3px}
+.badge.w{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.badge.p{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad)}
+.badge.n{background:color-mix(in srgb,var(--mut) 14%,transparent);color:var(--mut)}
+tr.dt td{background:var(--bg);padding:12px 14px 14px;border-bottom:1px solid var(--line)}
+tr.dt .cg{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px 18px;font-size:13.5px}
+tr.dt .k{color:var(--mut);font-size:11.5px;text-transform:uppercase;letter-spacing:.03em}
+tr.dt .pend{margin-top:10px;color:var(--warn);font-size:13.5px}
+tr.dt .ed{margin-top:12px}
+.al{padding:10px 14px}
+.al summary{cursor:pointer;font-weight:600;font-size:14px}
+.al .li{font-size:13.5px;padding:3px 0}
+@media(max-width:720px){
+  .tw{overflow:visible;background:none;border:0}
+  table,thead,tbody,tr,td{display:block}
+  thead{display:none}
+  tr.r{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px}
+  tr.r td{border:0;padding:2px 0}
+  td.n{text-align:left}
+  tr.dt{margin:-6px 0 10px}
+  tr.dt td{border:1px solid var(--line);border-radius:0 0 12px 12px;border-top:0}
+}
 </style>
 </head>
 <body>
 <header>
   <h1>📋 Subscrições e Contratos</h1>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+  <div class="tools">
     <span class="sub" id="who"></span>
-    <button id="bMem" style="display:none">Utilizadores</button>
-    <button id="bOut">Sair</button>
-    <button id="bCopy" title="Copia a tabela para colar no Excel">Copiar para Excel</button>
+    <button class="gh sm" id="bMem" style="display:none">Utilizadores</button>
+    <button class="gh sm" id="bCopy" title="Copia a tabela para colar no Excel">Copiar para Excel</button>
+    <button class="gh sm" id="bOut">Sair</button>
     <button class="pri" id="bNew">+ Nova subscrição</button>
   </div>
 </header>
@@ -83,17 +125,19 @@ details.sup .in{padding:2px 10px 10px}
   
   <div id="alertas"></div>
   <div class="kpis" id="kpis"></div>
-  <div class="cat-sum"><span class="chip on" id="vC">Contratos</span><span class="chip" id="vF">Por fornecedor (com CPEs)</span></div>
-  <div class="cat-sum" id="chips"></div>
+  <div class="chips"><span class="chip on" id="vC">Contratos</span><span class="chip" id="vF">Por fornecedor (com CPEs)</span></div>
+  <div class="chips" id="chips"></div>
+  <div class="catsum" id="catsum"></div>
   <div class="bar">
     <input id="q" type="search" placeholder="Pesquisar (cliente, fornecedor, local, conta…)">
-    <button id="bClr" class="sm" type="button">Limpar filtros</button>
-  </div>
-  <div class="bar">
     <select id="fCli"><option value="">Empresa / cliente: todos</option></select>
     <select id="fEsp"><option value="">Corresponde a: todos</option></select>
-    <select id="fUti"><option value="">Quem usa: todos</option></select>
     <select id="fFor"><option value="">Fornecedor: todos</option></select>
+    <button id="bMore" class="sm" type="button">Mais filtros ▾</button>
+    <button id="bClr" class="sm gh" type="button">Limpar</button>
+  </div>
+  <div class="bar" id="more" style="display:none">
+    <select id="fUti"><option value="">Quem usa: todos</option></select>
     <select id="fCat"><option value="">Categoria: todas</option></select>
     <select id="fPer"><option value="">Tipo: mensal e anual</option><option value="1">Mensal</option><option value="2">Bimestral</option><option value="3">Trimestral</option><option value="6">Semestral</option><option value="12">Anual</option><option value="24">Bianual (2 anos)</option></select>
     <select id="fFid"><option value="">Fidelização: todas</option><option value="sem">Sem fidelização</option><option value="com">Com fidelização</option></select>
@@ -220,7 +264,10 @@ function proxima(i){
   while(d<t&&n<600){d.setMonth(d.getMonth()+m);n++}
   return d.toISOString().slice(0,10);
 }
-const COLS=[["categoria","Categoria"],["fornecedor","Fornecedor"],["cliente","Cliente"],["espaco","Corresponde a / Localização"],["valor","Valor"],["pag","Pagamento / Origem"],["renov","Renovação"],["estado","Estado"]];
+const COLS=[["fornecedor","Contrato"],["cliente","Cliente / Corresponde a"],["valor","Valor"],["renov","Renovação"]];
+const PER={1:"mês",2:"bimestre",3:"trimestre",6:"semestre",12:"ano",24:"2 anos"};
+const kv=(k,v)=>v!==""&&v!=null?`<div><div class="k">${k}</div><div>${v}</div></div>`:"";
+let openRows=new Set();
 $("thead").innerHTML=COLS.map(([k,l])=>`<th data-k="${k}">${l}</th>`).join("");
 $("thead").onclick=e=>{const k=e.target.dataset?.k;if(!k)return;sortD=sortK===k?-sortD:1;sortK=k;render()};
 
@@ -245,7 +292,7 @@ function alertas(){
     if(i.fidel){const d=dias(i.fidel);if(d!==null&&d>=0&&d<=90)L.push({d,lv:fimAlerta(d),t:`<b>${esc(i.fornecedor)}</b> (${esc(i.cliente)}${i.espaco?" · "+esc(i.espaco):""}): fim de contrato/fidelização em <b>${d} dias</b> (${fd(i.fidel)})`})}
   });
   L.sort((a,b)=>a.d-b.d);
-  $("alertas").innerHTML=L.length?`<div class="al"><h3>⏰ Renovações e fins de contrato a chegar (alertas aos 90, 60 e 45 dias)</h3>${L.map(x=>`<div><span class="lv${x.lv}">${x.lv===45?"🔴 ≤45 dias":x.lv===60?"🟠 ≤60 dias":"🟡 ≤90 dias"}</span> · ${x.t}</div>`).join("")}</div>`:"";
+  $("alertas").innerHTML=L.length?`<details class="al" open><summary>⏰ ${L.length} renovaç${L.length>1?"ões":"ão"} / fim${L.length>1?"s":""} de contrato a chegar (alertas aos 90, 60 e 45 dias)</summary>${L.map(x=>`<div class="li"><span class="lv${x.lv}">${x.lv===45?"🔴 ≤45 dias":x.lv===60?"🟠 ≤60 dias":"🟡 ≤90 dias"}</span> · ${x.t}</div>`).join("")}</details>`:"";
 }
 function renderForn(){
   const g={};filtered().forEach(i=>{const k=(i.fornecedor||"").trim();(g[k]=g[k]||[]).push(i)});
@@ -287,35 +334,47 @@ function render(){
   const m=act.reduce((s,i)=>s+mensal(i),0);
   const prox=act.filter(i=>{const d=dias(proxima(i));return d!==null&&d<=30});
   const aviso=act.filter(i=>{const d=dias(proxima(i));return d!==null&&i.aviso&&d<=Number(i.aviso)+7&&d>=0});
+  const pend=act.filter(i=>i.acao_pendente).length;
   $("kpis").innerHTML=
-   `<div class="kpi"><div class="l">Subscrições ativas (na vista)</div><div class="v">${act.length}</div></div>
-    <div class="kpi"><div class="l">Custo mensal (equivalente)</div><div class="v">${eur(m)}</div></div>
-    <div class="kpi"><div class="l">Custo anual</div><div class="v">${eur(m*12)}</div></div>
-    <div class="kpi"><div class="l">Preço médio por subscrição</div><div class="v">${eur(act.length?m/act.length:0)}</div><div class="sub">por mês</div></div>
-    <div class="kpi"><div class="l">Renovam nos próx. 30 dias</div><div class="v">${prox.length}</div><div class="sub">${eur(prox.reduce((s,i)=>s+Number(i.valor||0),0))} a pagar</div></div>
-    <div class="kpi"><div class="l">⚠ Janela de cancelamento</div><div class="v">${aviso.length}</div><div class="sub">renovam dentro do aviso prévio</div></div>`;
+   `<div class="kpi"><div class="l">Contratos ativos</div><div class="v">${act.length}</div></div>
+    <div class="kpi"><div class="l">Custo mensal</div><div class="v">${eur(m)}</div><div class="sub">${eur(m*12)} por ano</div></div>
+    <div class="kpi"><div class="l">Renovam em 30 dias</div><div class="v">${prox.length}</div><div class="sub">${eur(prox.reduce((s,i)=>s+Number(i.valor||0),0))} a pagar</div></div>
+    <div class="kpi" id="kPend" style="cursor:pointer"><div class="l">Com ações a tratar</div><div class="v">${pend}</div><div class="sub">${aviso.length?aviso.length+" na janela de cancelamento":"clique para filtrar"}</div></div>`;
+  $("kPend").onclick=()=>{$("fEst").value=$("fEst").value==="pend"?"":"pend";render()};
   const cats={},cnt={};all.forEach(i=>{cats[i.categoria]=(cats[i.categoria]||0)+mensal(i);cnt[i.categoria]=(cnt[i.categoria]||0)+1});
-  $("chips").innerHTML=`<span class="chip ${catF?"":"on"}" data-c="">Todas</span>`+Object.keys(cats).map(c=>`<span class="chip ${catF===c?"on":""}" data-c="${esc(c)}">${esc(c)} · ${cnt[c]} · média ${eur(cats[c]/cnt[c])}/mês</span>`).join("");
+  $("chips").innerHTML=`<span class="chip ${catF?"":"on"}" data-c="">Todas<span class="c">${all.length}</span></span>`+Object.keys(cats).sort().map(c=>`<span class="chip ${catF===c?"on":""}" data-c="${esc(c)}">${esc(c)}<span class="c">${cnt[c]}</span></span>`).join("");
+  $("catsum").innerHTML=catF&&cnt[catF]?`<b>${esc(catF)}</b>: média de <b>${eur(cats[catF]/cnt[catF])}/mês</b> por contrato · total <b>${eur(cats[catF])}/mês</b> (${eur(cats[catF]*12)}/ano)`:"";
   $("chips").onclick=e=>{if(e.target.dataset.c!==undefined){catF=e.target.dataset.c;render()}};
   const rows=filtered().sort((a,b)=>{
     const f=k=>k==="renov"?proxima(a)&&proxima(b)?proxima(a)<proxima(b)?-1:1:0:(String(a[k]??"").localeCompare(String(b[k]??""),"pt",{numeric:true}));
     const x=sortK==="valor"?mensal(a)-mensal(b):f(sortK);return x*sortD});
   $("empty").style.display=items.length?"none":"block";
   $("tb").innerHTML=rows.map(i=>{
-    const p=proxima(i),d=dias(p);
-    const cls=i.estado==="cancelado"?"":d<=7?"x":d<=30?"s":"o";
-    const per={1:"mês",2:"bimestre",3:"trimestre",6:"semestre",12:"ano",24:"2 anos"}[i.period]||"";
-    return `<tr data-id="${esc(i.id)}" style="cursor:pointer;${i.estado==="cancelado"?"opacity:.5":""}">
-      <td><span class="tag">${esc(i.categoria)}</span></td>
-      <td><b>${esc(i.fornecedor)}</b><div class="sub">${esc(i.servico)}${i.contrato?" · "+esc(i.contrato):""}</div>${i.cpe?`<div class="sub">CPE/ponto: ${esc(i.cpe)}</div>`:""}<div class="sub">${det(i)}</div></td>
-      <td>${esc(i.cliente)}${i.utilizador?`<div class="sub">Usa: <b>${esc(i.utilizador)}</b></div>`:""}${i.acao_pendente?`<div class="sub" style="color:var(--warn)">⚠ ${esc(i.acao_pendente)}</div>`:""}</td><td>${i.espaco?`<span class="tag" style="font-weight:600">${esc(i.espaco)}</span><div class="sub">${esc(i.local)}</div>`:(esc(i.local)||"—")}</td>
-      <td class="n"><b>${eur(i.valor)}</b><div class="sub">/${per}${i.iva==="nao"?" + IVA":""}</div></td>
-      <td>${esc(i.pag)}<div class="sub">${esc(i.origem)}</div></td>
-      <td><span class="due ${cls}">${fd(p)}</span><div class="sub">${d===null?"":d===0?"hoje":d>0?"em "+d+" dias":""}${i.fidel?" · fidelização até "+fd(i.fidel):""}</div></td>
-      <td>${i.estado==="ativo"?"Ativo":i.estado==="cancelar"?"A cancelar":"Cancelado"}</td></tr>`}).join("");
+    const p=proxima(i),d=dias(p),cx=i.estado==="cancelado";
+    const cls=d===null?"n":d<=7?"p":d<=30?"w":"n";
+    const dTxt=d===null?"":d===0?"hoje":d>0?"em "+d+" dias":"";
+    const open=openRows.has(i.id);
+    const est=i.estado==="cancelar"?' <span class="badge w">A cancelar</span>':cx?' <span class="badge n">Cancelado</span>':"";
+    return `<tr class="r${cx?" cx":""}" data-id="${esc(i.id)}">
+      <td><b>${esc(i.fornecedor)}</b>${est}<div class="sub"><span class="tag">${esc(i.categoria)}</span> ${esc(i.servico)}</div></td>
+      <td><b>${esc(i.cliente)}</b>${i.acao_pendente?' <span class="badge w" title="'+esc(i.acao_pendente)+'">⚠ a tratar</span>':""}<div class="sub">${i.espaco?`<span class="tag" style="font-weight:600">${esc(i.espaco)}</span> `:""}${i.utilizador?"usa: "+esc(i.utilizador):""}</div></td>
+      <td class="n"><b>${eur(i.valor)}</b><div class="sub">/${PER[i.period]||""}${i.iva==="nao"?" + IVA":""}${Number(i.period)>1?" · ≈ "+eur(mensal(i))+"/mês":""}</div></td>
+      <td><b>${fd(p)}</b><div>${dTxt?`<span class="badge ${cls}">${dTxt}</span>`:""}</div>${i.fidel?`<div class="sub">fidelização até ${fd(i.fidel)}</div>`:""}</td></tr>
+    <tr class="dt" data-for="${esc(i.id)}" style="display:${open?"":"none"}"><td colspan="4">
+      <div class="cg">${kv("Localização",esc(i.local))}${kv("Nº contrato / cliente",esc(i.contrato))}${kv("CPE / ponto / contador",esc(i.cpe))}${kv("Pagamento",esc(i.pag))}${kv("Origem do dinheiro",esc(i.origem))}${kv("Aviso prévio",i.aviso!==""?i.aviso+" dias":"")}${kv("Detalhes",det(i))}${kv("Notas",esc(i.notas))}</div>
+      ${i.acao_pendente?`<div class="pend">⚠ A tratar: ${esc(i.acao_pendente)}</div>`:""}
+      <button class="sm ed" type="button" data-ed="${esc(i.id)}">Editar</button>
+    </td></tr>`}).join("");
   const used=[...new Set(items.map(i=>i.pag))];
 }
-$("tb").onclick=e=>{const tr=e.target.closest("tr");if(tr)openDlg(items.find(i=>i.id===tr.dataset.id))};
+$("tb").onclick=e=>{
+  const b=e.target.closest("button[data-ed]");
+  if(b){openDlg(items.find(i=>i.id===b.dataset.ed));return}
+  const tr=e.target.closest("tr.r");if(!tr)return;
+  const id=tr.dataset.id,dt=$("tb").querySelector('tr.dt[data-for="'+id+'"]');
+  if(openRows.has(id)){openRows.delete(id);dt.style.display="none"}else{openRows.add(id);dt.style.display=""}
+};
+$("bMore").onclick=()=>{const m=$("more"),o=m.style.display==="none";m.style.display=o?"":"none";$("bMore").textContent=o?"Menos filtros ▴":"Mais filtros ▾"};
 ["q","fEst","fPag","fCli","fUti","fEsp","fFor","fPer","fFid"].forEach(id=>$(id).oninput=render);
 $("fCat").oninput=()=>{catF=$("fCat").value;render()};
 $("bClr").onclick=()=>{["q","fEst","fPag","fCli","fUti","fEsp","fFor","fPer","fFid"].forEach(id=>$(id).value="");catF="";render()};
