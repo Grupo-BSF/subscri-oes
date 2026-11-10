@@ -113,6 +113,15 @@ form input,form select,form textarea{width:100%;font:inherit;padding:8px 10px;bo
     <div><label>Estado</label><select id="estado"><option value="ativo">Ativo</option><option value="cancelar">A cancelar</option><option value="cancelado">Cancelado</option></select></div>
     <div class="f"><label>Notas</label><textarea id="notas" rows="2" placeholder="Contactos, condições, cláusulas, etc."></textarea></div>
   </div>
+  <div id="docBox" style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
+    <label>Documentos (faturas, contratos)</label>
+    <div id="docList" style="margin:6px 0"></div>
+    <div id="docUp" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <select id="docTipo" style="width:auto"><option value="fatura">Fatura</option><option value="contrato">Contrato</option><option value="outro">Outro</option></select>
+      <input id="docFile" type="file" accept=".pdf,image/*" multiple style="width:auto;flex:1;min-width:200px">
+    </div>
+    <div class="hint" id="docHint"></div>
+  </div>
   <div class="act">
     <button type="button" id="bDel" class="sm" style="display:none;color:var(--bad)">Apagar</button>
     <span style="margin-left:auto;display:flex;gap:8px">
@@ -152,7 +161,7 @@ form input,form select,form textarea{width:100%;font:inherit;padding:8px 10px;bo
 <div id="toast"></div>
 
 <script>
-const CATS=["Telecomunicações","Pacote completo (net + TV + voz)","Alarmes / Segurança","Seguros","Luz","Água","Gás","Software / Online","Outro"];
+const CATS=["Telecomunicações","Pacote completo (net + TV + voz)","Alarmes / Segurança","Seguros","Eletricidade","Água","Gás","Software / Online","Outro"];
 const PAGS=["Débito direto","Cartão de crédito","Cartão de débito","Transferência bancária","Referência Multibanco","Numerário","Outra"];
 const $=id=>document.getElementById(id);
 const eur=n=>new Intl.NumberFormat("pt-PT",{style:"currency",currency:"EUR"}).format(n||0);
@@ -266,9 +275,14 @@ async function load(){
 }
 async function save(id,o){
   const row=toRow(o);
-  const q=editing?sb.from("subscricoes").update(row).eq("id",editing.id):sb.from("subscricoes").insert(row);
-  const {error}=await q;
-  if(error)toast("Erro ao guardar: "+error.message);else{toast("Guardado");await load()}
+  if(editing){
+    const {error}=await sb.from("subscricoes").update(row).eq("id",editing.id);
+    if(error){toast("Erro ao guardar: "+error.message);return null}
+    toast("Guardado");await load();return editing.id;
+  }
+  const {data,error}=await sb.from("subscricoes").insert(row).select("id").single();
+  if(error){toast("Erro ao guardar: "+error.message);return null}
+  toast("Guardado");await load();return data.id;
 }
 async function remove(id){
   const {error}=await sb.from("subscricoes").delete().eq("id",id);
@@ -277,7 +291,9 @@ async function remove(id){
 $("frm").onsubmit=async e=>{
   e.preventDefault();
   const o={};F.forEach(k=>o[k]=$(k).value);o.valor=Number(o.valor);
-  await save(editing?editing.id:null,o);$("dlg").close();
+  const isNew=!editing;
+  const id=await save(null,o);$("dlg").close();
+  if(isNew&&id){const it=items.find(x=>x.id===id);if(it){openDlg(it);toast("Guardado. Já pode anexar faturas e contratos.")}}
 };
 
 // ---------- sessão ----------
@@ -297,8 +313,47 @@ async function enter(session){
   if(chan)sb.removeChannel(chan);
   chan=sb.channel("subs").on("postgres_changes",{event:"*",schema:"public",table:"subscricoes"},()=>load()).subscribe();
 }
+const safe=n=>n.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Za-z0-9._-]+/g,"_").slice(-80);
+const TIPO={fatura:"Fatura",contrato:"Contrato",outro:"Outro"};
+async function loadDocs(){
+  const ed=canEdit();
+  $("docUp").style.display=editing&&ed?"flex":"none";
+  if(!editing){$("docList").innerHTML="";$("docHint").textContent="Guarde primeiro a subscrição; depois pode anexar documentos.";return}
+  $("docHint").textContent=ed?"PDF ou imagem, até 15 MB cada.":"";
+  const {data,error}=await sb.from("documentos").select("*").eq("subscricao_id",editing.id).order("criado_em",{ascending:false});
+  if(error){$("docList").textContent="Erro: "+error.message;return}
+  $("docList").innerHTML=data.length?data.map(d=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)"><span><span class="tag">${TIPO[d.tipo]}</span> <a href="#" class="lnk" data-open="${esc(d.caminho)}">${esc(d.nome)}</a> <span class="sub">${new Date(d.criado_em).toLocaleDateString("pt-PT")}</span></span>${ed?`<a href="#" class="lnk" style="color:var(--bad)" data-del="${d.id}" data-path="${esc(d.caminho)}">apagar</a>`:""}</div>`).join(""):'<span class="sub">Sem documentos.</span>';
+}
+$("docList").onclick=async e=>{
+  const a=e.target.closest("a");if(!a)return;e.preventDefault();
+  if(a.dataset.open){
+    const w=window.open("","_blank");
+    const {data,error}=await sb.storage.from("documentos").createSignedUrl(a.dataset.open,300);
+    if(error){if(w)w.close();toast(error.message);return}
+    if(w)w.location=data.signedUrl;else location.href=data.signedUrl;
+  }else if(a.dataset.del){
+    if(a.dataset.arm!=="1"){a.dataset.arm="1";a.textContent="confirmar?";return}
+    await sb.storage.from("documentos").remove([a.dataset.path]);
+    const {error}=await sb.from("documentos").delete().eq("id",a.dataset.del);
+    if(error)toast(error.message);await loadDocs();
+  }
+};
+$("docFile").onchange=async()=>{
+  if(!editing)return;
+  const files=[...$("docFile").files];let ok=0;
+  for(const f of files){
+    if(f.size>15*1024*1024){toast(f.name+" excede 15 MB");continue}
+    const path=editing.id+"/"+crypto.randomUUID()+"-"+safe(f.name);
+    const up=await sb.storage.from("documentos").upload(path,f,{contentType:f.type||undefined});
+    if(up.error){toast("Erro: "+up.error.message);continue}
+    const ins=await sb.from("documentos").insert({subscricao_id:editing.id,tipo:$("docTipo").value,nome:f.name,caminho:path});
+    if(ins.error){await sb.storage.from("documentos").remove([path]);toast("Erro: "+ins.error.message);continue}
+    ok++;
+  }
+  $("docFile").value="";if(ok)toast(ok+" documento(s) anexado(s)");await loadDocs();
+};
 const _open=openDlg;
-openDlg=function(it){_open(it);const ro=!canEdit();[...$("frm").elements].forEach(el=>{if(el.id!=="bCancel")el.disabled=ro});if(ro){$("dT").textContent="Detalhe (só leitura)"}};
+openDlg=function(it){_open(it);const ro=!canEdit();[...$("frm").elements].forEach(el=>{if(el.id!=="bCancel")el.disabled=ro});if(ro){$("dT").textContent="Detalhe (só leitura)"}loadDocs()};
 $("lf").onsubmit=async e=>{
   e.preventDefault();$("lErr").textContent="";$("lGo").disabled=true;
   const email=$("lEmail").value.trim(),password=$("lPass").value;
