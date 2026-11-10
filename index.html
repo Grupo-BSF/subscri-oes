@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Subscrições e Contratos</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{--bg:#f6f5f1;--card:#fff;--ink:#1f2933;--mut:#6b7280;--line:#e5e2d9;--acc:#0f766e;--acc2:#115e59;--warn:#b45309;--bad:#b91c1c;--ok:#15803d}
 @media (prefers-color-scheme:dark){:root{--bg:#14181c;--card:#1d2328;--ink:#e8ecef;--mut:#98a2ad;--line:#2d353c;--acc:#2dd4bf;--acc2:#5eead4;--warn:#fbbf24;--bad:#f87171;--ok:#4ade80}}
@@ -108,6 +109,27 @@ tr.dt .ed{margin-top:12px}
   tr.dt{margin:-6px 0 10px}
   tr.dt td{border:1px solid var(--line);border-radius:0 0 12px 12px;border-top:0}
 }
+
+@media print{
+  @page{size:A4 landscape;margin:10mm}
+  body{background:#fff;color:#000;font-size:11px}
+  header .tools,.chips,.bar,#more,.catsum,#toast,#alertas,.kpis,button,dialog,#login{display:none!important}
+  header{padding:0 0 6px}h1{font-size:16px}
+  main{max-width:none;padding:0}
+  #forn{display:none!important}
+  .tw{display:block!important;overflow:visible;border:0}
+  table,thead,tbody{display:table-row-group!important}
+  table{display:table!important;width:100%}
+  thead{display:table-header-group!important}
+  tr{display:table-row!important;break-inside:avoid}
+  td,th{display:table-cell!important;border-bottom:1px solid #bbb!important;padding:4px 6px}
+  tr.r{border:0!important;background:none!important;padding:0!important;margin:0!important}
+  tr.dt{display:table-row!important}
+  tr.dt td{background:#f4f4f4!important;border:0!important;padding:4px 8px 8px}
+  tr.dt .cg{grid-template-columns:repeat(4,1fr);font-size:10.5px}
+  .tag,.badge{border:1px solid #999;background:none!important;color:#000!important}
+  .sub{color:#333!important}
+}
 </style>
 </head>
 <body>
@@ -116,7 +138,9 @@ tr.dt .ed{margin-top:12px}
   <div class="tools">
     <span class="sub" id="who"></span>
     <button class="gh sm" id="bMem" style="display:none">Utilizadores</button>
-    <button class="gh sm" id="bCopy" title="Copia a tabela para colar no Excel">Copiar para Excel</button>
+    <button class="gh sm" id="bCopy" title="Copia a tabela para colar no Excel">Copiar</button>
+    <button class="sm" id="bPrint">🖨 Imprimir</button>
+    <button class="sm" id="bXls">⬇ Excel (.xlsx)</button>
     <button class="gh sm" id="bOut">Sair</button>
     <button class="pri" id="bNew">+ Nova subscrição</button>
   </div>
@@ -373,6 +397,33 @@ $("tb").onclick=e=>{
   const tr=e.target.closest("tr.r");if(!tr)return;
   const id=tr.dataset.id,dt=$("tb").querySelector('tr.dt[data-for="'+id+'"]');
   if(openRows.has(id)){openRows.delete(id);dt.style.display="none"}else{openRows.add(id);dt.style.display=""}
+};
+window.addEventListener("beforeprint",()=>{document.querySelectorAll("#tb tr.dt").forEach(r=>r.style.display="")});
+window.addEventListener("afterprint",()=>{document.querySelectorAll("#tb tr.dt").forEach(r=>r.style.display=openRows.has(r.dataset.for)?"":"none")});
+$("bPrint").onclick=()=>{if(vista!=="C")setVista("C");setTimeout(()=>window.print(),50)};
+function dtc(s){return s?new Date(s+"T00:00:00"):null}
+$("bXls").onclick=()=>{
+  if(typeof XLSX==="undefined"){toast("Não foi possível carregar o gerador de Excel");return}
+  const rows=filtered().sort((a,b)=>(a.categoria+a.fornecedor).localeCompare(b.categoria+b.fornecedor,"pt"));
+  const H=["Categoria","Fornecedor","Serviço / plano","Cliente (titular)","Corresponde a","Quem usa","Localização","Nº contrato / cliente","CPE / ponto / contador","Valor (€)","Periodicidade","Equivalente mensal (€)","Equivalente anual (€)","IVA incluído","Forma de pagamento","Origem do dinheiro","Próxima renovação","Aviso prévio (dias)","Fim fidelização","Estado","Potência (kVA)","Tarifa","Consumo médio","Preço unitário (€)","Velocidade","Canais / linhas","Capital seguro (€)","Franquia (€)","A tratar","Notas"];
+  const nn=v=>v===""||v==null?null:Number(v);
+  const data=rows.map(i=>[i.categoria,i.fornecedor,i.servico,i.cliente,i.espaco,i.utilizador,i.local,i.contrato,i.cpe,Number(i.valor),({1:"Mensal",2:"Bimestral",3:"Trimestral",6:"Semestral",12:"Anual",24:"Bianual"})[i.period]||i.period,Math.round(mensal(i)*100)/100,Math.round(mensal(i)*1200)/100,i.iva==="sim"?"Sim":"Não",i.pag,i.origem,dtc(proxima(i)),nn(i.aviso),dtc(i.fidel),({ativo:"Ativo",cancelar:"A cancelar",cancelado:"Cancelado"})[i.estado]||i.estado,nn(i.potencia),i.tarifa,nn(i.consumo),nn(i.preco_un),i.velocidade,i.canais,nn(i.capital),nn(i.franquia),i.acao_pendente,i.notas].map(v=>v===""||v===undefined?null:v));
+  const ws=XLSX.utils.aoa_to_sheet([H,...data],{cellDates:true});
+  ws["!cols"]=H.map((h,k)=>({wch:[16,22,28,26,16,16,30,24,28,10,12,12,12,8,20,30,13,10,13,11,9,12,10,10,12,16,10,10,36,50][k]||14}));
+  ws["!freeze"]={xSplit:2,ySplit:1};ws["!views"]=[{state:"frozen",xSplit:2,ySplit:1}];
+  ws["!autofilter"]={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:data.length,c:H.length-1}})};
+  data.forEach((_,r)=>{[9,11,12,23,26,27].forEach(c=>{const cell=ws[XLSX.utils.encode_cell({r:r+1,c})];if(cell&&cell.t==="n")cell.z=c===23?"0.0000":"#,##0.00"});[16,18].forEach(c=>{const cell=ws[XLSX.utils.encode_cell({r:r+1,c})];if(cell)cell.z="dd/mm/yyyy"})});
+  const act=rows.filter(i=>i.estado!=="cancelado");
+  const grp=(k)=>{const g={};act.forEach(i=>{const x=i[k]||"(sem indicação)";(g[x]=g[x]||[]).push(i)});return Object.keys(g).sort((a,b)=>a.localeCompare(b,"pt")).map(x=>{const m=g[x].reduce((s,i)=>s+mensal(i),0);return [x,g[x].length,Math.round(m*100)/100,Math.round(m/g[x].length*100)/100,Math.round(m*1200)/100]})};
+  const sumSheet=(lbl,k)=>{const r=grp(k);const w=XLSX.utils.aoa_to_sheet([[lbl,"Nº contratos","Total mensal (€)","Média mensal por contrato (€)","Total anual (€)"],...r,["TOTAL",act.length,Math.round(act.reduce((s,i)=>s+mensal(i),0)*100)/100,null,Math.round(act.reduce((s,i)=>s+mensal(i),0)*1200)/100]]);w["!cols"]=[{wch:34},{wch:12},{wch:16},{wch:28},{wch:16}];return w};
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"Contratos");
+  XLSX.utils.book_append_sheet(wb,sumSheet("Categoria","categoria"),"Por categoria");
+  XLSX.utils.book_append_sheet(wb,sumSheet("Fornecedor","fornecedor"),"Por fornecedor");
+  XLSX.utils.book_append_sheet(wb,sumSheet("Corresponde a","espaco"),"Por espaço");
+  XLSX.utils.book_append_sheet(wb,sumSheet("Cliente (titular)","cliente"),"Por cliente");
+  XLSX.writeFile(wb,"subscricoes-"+new Date().toISOString().slice(0,10)+".xlsx",{cellDates:true});
+  toast("Excel gerado ("+rows.length+" contratos)");
 };
 $("bMore").onclick=()=>{const m=$("more"),o=m.style.display==="none";m.style.display=o?"":"none";$("bMore").textContent=o?"Menos filtros ▴":"Mais filtros ▾"};
 ["q","fEst","fPag","fCli","fUti","fEsp","fFor","fPer","fFid"].forEach(id=>$(id).oninput=render);
