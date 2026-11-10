@@ -77,11 +77,12 @@ form input,form select,form textarea{width:100%;font:inherit;padding:8px 10px;bo
   </div>
   <div class="bar">
     <select id="fCli"><option value="">Empresa / cliente: todos</option></select>
+    <select id="fUti"><option value="">Quem usa: todos</option></select>
     <select id="fFor"><option value="">Fornecedor: todos</option></select>
     <select id="fCat"><option value="">Categoria: todas</option></select>
     <select id="fPer"><option value="">Tipo: mensal e anual</option><option value="1">Mensal</option><option value="2">Bimestral</option><option value="3">Trimestral</option><option value="6">Semestral</option><option value="12">Anual</option></select>
     <select id="fFid"><option value="">Fidelização: todas</option><option value="sem">Sem fidelização</option><option value="com">Com fidelização</option></select>
-    <select id="fEst"><option value="">Estado: todos</option><option value="ativo">Ativos</option><option value="cancelar">A cancelar</option><option value="cancelado">Cancelados</option></select>
+    <select id="fEst"><option value="">Estado: todos</option><option value="pend">Com ações a tratar</option><option value="ativo">Ativos</option><option value="cancelar">A cancelar</option><option value="cancelado">Cancelados</option></select>
     <select id="fPag"><option value="">Pagamento: todos</option></select>
   </div>
   <div class="tw"><table>
@@ -98,6 +99,7 @@ form input,form select,form textarea{width:100%;font:inherit;padding:8px 10px;bo
     <div><label>Fornecedor / Operadora *</label><input id="fornecedor" required placeholder="Ex.: MEO, Verisure, Fidelidade, EDP, Águas do Ribatejo"></div>
     <div><label>Serviço / Plano</label><input id="servico" placeholder="Ex.: Fibra 1Gb + TV, Alarme com videovigilância"></div>
     <div><label>Nome do cliente (titular) *</label><input id="cliente" required placeholder="Ex.: CAF, NCV, Clube da Lapa, pessoal"></div>
+    <div><label>Quem usa (se diferente do titular)</label><input id="utilizador" list="dlUti" placeholder="Ex.: Casa da Vera, Clube da Lapa, escritório"><datalist id="dlUti"></datalist></div>
     <div><label>Localização</label><input id="local" placeholder="Ex.: Cartaxo – Clube da Lapa"></div>
     <div><label>Nº de contrato / cliente / apólice</label><input id="contrato"></div>
     <div><label>Valor (€) *</label><input id="valor" type="number" step="0.01" min="0" required></div>
@@ -119,6 +121,7 @@ form input,form select,form textarea{width:100%;font:inherit;padding:8px 10px;bo
     <div id="w_canais" data-cats="Telecomunicações|Pacote completo (net + TV + voz)"><label>Canais / linhas / telemóveis</label><input id="canais" placeholder="Ex.: 160 canais, 2 telemóveis"></div>
     <div id="w_capital" data-cats="Seguros"><label>Capital seguro (€)</label><input id="capital" type="number" step="0.01" min="0"></div>
     <div id="w_franquia" data-cats="Seguros"><label>Franquia (€)</label><input id="franquia" type="number" step="0.01" min="0"></div>
+    <div class="f"><label>⚠ A tratar (alterações a pedir ao fornecedor)</label><textarea id="acao_pendente" rows="2" placeholder="Ex.: alterar titular de S.A. para Lda, atualizar morada"></textarea></div>
     <div class="f"><label>Notas</label><textarea id="notas" rows="2" placeholder="Contactos, condições, cláusulas, etc."></textarea></div>
   </div>
   <div id="docBox" style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
@@ -204,9 +207,9 @@ $("thead").innerHTML=COLS.map(([k,l])=>`<th data-k="${k}">${l}</th>`).join("");
 $("thead").onclick=e=>{const k=e.target.dataset?.k;if(!k)return;sortD=sortK===k?-sortD:1;sortK=k;render()};
 
 function filtered(){
-  const q=$("q").value.toLowerCase(),e=$("fEst").value,p=$("fPag").value,cl=$("fCli").value,fo=$("fFor").value,pe=$("fPer").value,fi=$("fFid").value;
+  const q=$("q").value.toLowerCase(),e=$("fEst").value,p=$("fPag").value,cl=$("fCli").value,ut=$("fUti").value,fo=$("fFor").value,pe=$("fPer").value,fi=$("fFid").value;
   const hoje=new Date().toISOString().slice(0,10);
-  return items.filter(i=>(!catF||i.categoria===catF)&&(!e||i.estado===e)&&(!p||i.pag===p)&&(!cl||i.cliente===cl)&&(!fo||i.fornecedor===fo)&&(!pe||String(i.period)===pe)&&
+  return items.filter(i=>(!catF||i.categoria===catF)&&(!e||(e==="pend"?!!i.acao_pendente:i.estado===e))&&(!p||i.pag===p)&&(!cl||i.cliente===cl)&&(!ut||(i.utilizador||"")===ut)&&(!fo||i.fornecedor===fo)&&(!pe||String(i.period)===pe)&&
     (!fi||(fi==="com"?(i.fidel&&i.fidel>=hoje):!(i.fidel&&i.fidel>=hoje)))&&
     (!q||[i.fornecedor,i.servico,i.cliente,i.local,i.origem,i.contrato,i.notas,i.categoria].join(" ").toLowerCase().includes(q)));
 }
@@ -216,7 +219,7 @@ function fillSel(id,vals){
   el.value=[...el.options].some(o=>o.value===cur)?cur:"";
 }
 function render(){
-  fillSel("fCli",items.map(i=>i.cliente));fillSel("fFor",items.map(i=>i.fornecedor));fillSel("fCat",items.map(i=>i.categoria));fillSel("fPag",items.map(i=>i.pag));
+  fillSel("fCli",items.map(i=>i.cliente));fillSel("fUti",items.map(i=>i.utilizador));$("dlUti").innerHTML=[...new Set(items.map(i=>i.utilizador).filter(Boolean))].map(v=>`<option value="${esc(v)}">`).join("");fillSel("fFor",items.map(i=>i.fornecedor));fillSel("fCat",items.map(i=>i.categoria));fillSel("fPag",items.map(i=>i.pag));
   $("fCat").value=catF;
   const all=items.filter(i=>i.estado!=="cancelado");
   const act=filtered().filter(i=>i.estado!=="cancelado");
@@ -244,7 +247,7 @@ function render(){
     return `<tr data-id="${esc(i.id)}" style="cursor:pointer;${i.estado==="cancelado"?"opacity:.5":""}">
       <td><span class="tag">${esc(i.categoria)}</span></td>
       <td><b>${esc(i.fornecedor)}</b><div class="sub">${esc(i.servico)}${i.contrato?" · "+esc(i.contrato):""}</div><div class="sub">${det(i)}</div></td>
-      <td>${esc(i.cliente)}</td><td>${esc(i.local)||"—"}</td>
+      <td>${esc(i.cliente)}${i.utilizador?`<div class="sub">Usa: <b>${esc(i.utilizador)}</b></div>`:""}${i.acao_pendente?`<div class="sub" style="color:var(--warn)">⚠ ${esc(i.acao_pendente)}</div>`:""}</td><td>${esc(i.local)||"—"}</td>
       <td class="n"><b>${eur(i.valor)}</b><div class="sub">/${per}${i.iva==="nao"?" + IVA":""}</div></td>
       <td>${esc(i.pag)}<div class="sub">${esc(i.origem)}</div></td>
       <td><span class="due ${cls}">${fd(p)}</span><div class="sub">${d===null?"":d===0?"hoje":d>0?"em "+d+" dias":""}${i.fidel?" · fidelização até "+fd(i.fidel):""}</div></td>
@@ -252,12 +255,12 @@ function render(){
   const used=[...new Set(items.map(i=>i.pag))];
 }
 $("tb").onclick=e=>{const tr=e.target.closest("tr");if(tr)openDlg(items.find(i=>i.id===tr.dataset.id))};
-["q","fEst","fPag","fCli","fFor","fPer","fFid"].forEach(id=>$(id).oninput=render);
+["q","fEst","fPag","fCli","fUti","fFor","fPer","fFid"].forEach(id=>$(id).oninput=render);
 $("fCat").oninput=()=>{catF=$("fCat").value;render()};
-$("bClr").onclick=()=>{["q","fEst","fPag","fCli","fFor","fPer","fFid"].forEach(id=>$(id).value="");catF="";render()};
+$("bClr").onclick=()=>{["q","fEst","fPag","fCli","fUti","fFor","fPer","fFid"].forEach(id=>$(id).value="");catF="";render()};
 
 const DET=["potencia","tarifa","consumo","preco_un","velocidade","canais","capital","franquia"];
-const F=["categoria","fornecedor","servico","cliente","local","contrato","valor","period","iva","pag","origem","renov","aviso","fidel","estado","notas",...DET];
+const F=["utilizador","acao_pendente","categoria","fornecedor","servico","cliente","local","contrato","valor","period","iva","pag","origem","renov","aviso","fidel","estado","notas",...DET];
 function updDet(){const c=$("categoria").value;DET.forEach(k=>{const w=$("w_"+k);w.style.display=w.dataset.cats.split("|").includes(c)?"":"none"})}
 $("categoria").addEventListener("change",updDet);
 var openDlg=function(it){
@@ -287,8 +290,8 @@ const sb=supabase.createClient(SB_URL,SB_KEY);
 let papel=null,meEmail="",signup=false,chan=null;
 const canEdit=()=>papel==="admin"||papel==="editor";
 const num=v=>v===""||v==null?null:Number(v);
-const fromRow=r=>({id:r.id,categoria:r.categoria,fornecedor:r.fornecedor,servico:r.servico||"",cliente:r.cliente,local:r.localizacao||"",contrato:r.contrato||"",valor:Number(r.valor),period:String(r.periodicidade_meses),iva:r.iva_incluido?"sim":"nao",pag:r.forma_pagamento,origem:r.origem_pagamento,renov:r.data_renovacao,aviso:r.aviso_dias??"",fidel:r.fim_fidelizacao||"",estado:r.estado,notas:r.notas||"",potencia:r.potencia_kva??"",tarifa:r.tarifa||"",consumo:r.consumo_medio??"",preco_un:r.preco_unitario??"",velocidade:r.velocidade||"",canais:r.canais_linhas||"",capital:r.capital_seguro??"",franquia:r.franquia??"",por:r.atualizado_por||r.criado_por});
-const toRow=o=>({categoria:o.categoria,fornecedor:o.fornecedor,servico:o.servico||null,cliente:o.cliente,localizacao:o.local||null,contrato:o.contrato||null,valor:o.valor,periodicidade_meses:Number(o.period),iva_incluido:o.iva==="sim",forma_pagamento:o.pag,origem_pagamento:o.origem,data_renovacao:o.renov,aviso_dias:o.aviso===""?null:Number(o.aviso),fim_fidelizacao:o.fidel||null,estado:o.estado,notas:o.notas||null,potencia_kva:num(o.potencia),tarifa:o.tarifa||null,consumo_medio:num(o.consumo),preco_unitario:num(o.preco_un),velocidade:o.velocidade||null,canais_linhas:o.canais||null,capital_seguro:num(o.capital),franquia:num(o.franquia)});
+const fromRow=r=>({id:r.id,categoria:r.categoria,fornecedor:r.fornecedor,servico:r.servico||"",cliente:r.cliente,local:r.localizacao||"",contrato:r.contrato||"",valor:Number(r.valor),period:String(r.periodicidade_meses),iva:r.iva_incluido?"sim":"nao",pag:r.forma_pagamento,origem:r.origem_pagamento,renov:r.data_renovacao,aviso:r.aviso_dias??"",fidel:r.fim_fidelizacao||"",estado:r.estado,notas:r.notas||"",utilizador:r.utilizador||"",acao_pendente:r.acao_pendente||"",potencia:r.potencia_kva??"",tarifa:r.tarifa||"",consumo:r.consumo_medio??"",preco_un:r.preco_unitario??"",velocidade:r.velocidade||"",canais:r.canais_linhas||"",capital:r.capital_seguro??"",franquia:r.franquia??"",por:r.atualizado_por||r.criado_por});
+const toRow=o=>({categoria:o.categoria,fornecedor:o.fornecedor,servico:o.servico||null,cliente:o.cliente,localizacao:o.local||null,contrato:o.contrato||null,valor:o.valor,periodicidade_meses:Number(o.period),iva_incluido:o.iva==="sim",forma_pagamento:o.pag,origem_pagamento:o.origem,data_renovacao:o.renov,aviso_dias:o.aviso===""?null:Number(o.aviso),fim_fidelizacao:o.fidel||null,estado:o.estado,notas:o.notas||null,utilizador:o.utilizador||null,acao_pendente:o.acao_pendente||null,potencia_kva:num(o.potencia),tarifa:o.tarifa||null,consumo_medio:num(o.consumo),preco_unitario:num(o.preco_un),velocidade:o.velocidade||null,canais_linhas:o.canais||null,capital_seguro:num(o.capital),franquia:num(o.franquia)});
 
 async function load(){
   const {data,error}=await sb.from("subscricoes").select("*").order("data_renovacao");
