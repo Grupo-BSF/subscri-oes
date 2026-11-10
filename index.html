@@ -47,6 +47,13 @@ form input,form select,form textarea{width:100%;font:inherit;padding:8px 10px;bo
 .hint{font-size:12px;color:var(--mut);margin-top:3px}
 .cat-sum{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .chip{font-size:12.5px;padding:3px 10px;border:1px solid var(--line);border-radius:99px;background:var(--card);cursor:pointer}
+.al{border:1px solid var(--warn);background:color-mix(in srgb,var(--warn) 10%,transparent);border-radius:12px;padding:10px 14px;margin:10px 0}
+.al h3{margin:0 0 6px;font-size:14px}.al div{font-size:13.5px;padding:2px 0}
+.lv45{color:var(--bad);font-weight:700}.lv60{color:var(--warn);font-weight:700}.lv90{font-weight:700}
+details.sup{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:8px}
+details.sup>summary{padding:11px 14px;cursor:pointer;font-weight:600;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+details.sup .in{padding:0 8px 10px;overflow-x:auto}
+details.sup table{min-width:900px;font-size:13px}
 .chip.on{background:var(--acc);color:#fff;border-color:var(--acc)}
 #login{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
 #login .box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px;width:min(380px,100%)}
@@ -69,7 +76,9 @@ form input,form select,form textarea{width:100%;font:inherit;padding:8px 10px;bo
 </header>
 <main>
   
+  <div id="alertas"></div>
   <div class="kpis" id="kpis"></div>
+  <div class="cat-sum"><span class="chip on" id="vC">Contratos</span><span class="chip" id="vF">Por fornecedor (com CPEs)</span></div>
   <div class="cat-sum" id="chips"></div>
   <div class="bar">
     <input id="q" type="search" placeholder="Pesquisar (cliente, fornecedor, local, conta…)">
@@ -81,12 +90,13 @@ form input,form select,form textarea{width:100%;font:inherit;padding:8px 10px;bo
     <select id="fUti"><option value="">Quem usa: todos</option></select>
     <select id="fFor"><option value="">Fornecedor: todos</option></select>
     <select id="fCat"><option value="">Categoria: todas</option></select>
-    <select id="fPer"><option value="">Tipo: mensal e anual</option><option value="1">Mensal</option><option value="2">Bimestral</option><option value="3">Trimestral</option><option value="6">Semestral</option><option value="12">Anual</option></select>
+    <select id="fPer"><option value="">Tipo: mensal e anual</option><option value="1">Mensal</option><option value="2">Bimestral</option><option value="3">Trimestral</option><option value="6">Semestral</option><option value="12">Anual</option><option value="24">Bianual (2 anos)</option></select>
     <select id="fFid"><option value="">Fidelização: todas</option><option value="sem">Sem fidelização</option><option value="com">Com fidelização</option></select>
     <select id="fEst"><option value="">Estado: todos</option><option value="pend">Com ações a tratar</option><option value="ativo">Ativos</option><option value="cancelar">A cancelar</option><option value="cancelado">Cancelados</option></select>
     <select id="fPag"><option value="">Pagamento: todos</option></select>
   </div>
-  <div class="tw"><table>
+  <div id="forn" style="display:none"></div>
+  <div class="tw" id="twC"><table>
     <thead><tr id="thead"></tr></thead>
     <tbody id="tb"></tbody>
   </table><div class="empty" id="empty" style="display:none">Ainda não há subscrições. Carregue em “+ Nova subscrição”.</div></div>
@@ -104,9 +114,10 @@ form input,form select,form textarea{width:100%;font:inherit;padding:8px 10px;bo
     <div><label>Corresponde a (espaço / unidade)</label><input id="espaco" list="dlEsp" placeholder="Ex.: Residencial, Pastelaria, Escritório"><datalist id="dlEsp"><option value="Residencial"><option value="Pastelaria"><option value="Escritório"><option value="Casa da Vera"><option value="Armazém"><option value="Obra"></datalist></div>
     <div><label>Localização</label><input id="local" placeholder="Ex.: Cartaxo – Clube da Lapa"></div>
     <div><label>Nº de contrato / cliente / apólice</label><input id="contrato"></div>
+    <div><label>CPE / ponto de entrega / contador</label><input id="cpe" placeholder="Ex.: PT 0002 0001 0396 5844 YM"></div>
     <div><label>Valor (€) *</label><input id="valor" type="number" step="0.01" min="0" required></div>
     <div><label>Periodicidade *</label><select id="period">
-      <option value="1">Mensal</option><option value="2">Bimestral</option><option value="3">Trimestral</option><option value="6">Semestral</option><option value="12">Anual</option></select></div>
+      <option value="1">Mensal</option><option value="2">Bimestral</option><option value="3">Trimestral</option><option value="6">Semestral</option><option value="12">Anual</option><option value="24">Bianual (2 anos)</option></select></div>
     <div><label>O valor inclui IVA?</label><select id="iva"><option value="sim">Sim</option><option value="nao">Não (acresce IVA)</option></select></div>
     <div><label>Forma de pagamento *</label><select id="pag" required></select></div>
     <div class="f"><label>De onde sai o dinheiro (conta / cartão / empresa pagadora) *</label><input id="origem" required placeholder="Ex.: Conta CGD da CAF · Cartão Visa final 4417 · Conta pessoal Millennium">
@@ -213,14 +224,45 @@ function filtered(){
   const hoje=new Date().toISOString().slice(0,10);
   return items.filter(i=>(!catF||i.categoria===catF)&&(!e||(e==="pend"?!!i.acao_pendente:i.estado===e))&&(!p||i.pag===p)&&(!cl||i.cliente===cl)&&(!ut||(i.utilizador||"")===ut)&&(!es||(i.espaco||"")===es)&&(!fo||i.fornecedor===fo)&&(!pe||String(i.period)===pe)&&
     (!fi||(fi==="com"?(i.fidel&&i.fidel>=hoje):!(i.fidel&&i.fidel>=hoje)))&&
-    (!q||[i.fornecedor,i.servico,i.cliente,i.espaco,i.local,i.origem,i.contrato,i.notas,i.categoria].join(" ").toLowerCase().includes(q)));
+    (!q||[i.fornecedor,i.servico,i.cliente,i.cpe,i.espaco,i.local,i.origem,i.contrato,i.notas,i.categoria].join(" ").toLowerCase().includes(q)));
 }
 function fillSel(id,vals){
   const el=$(id),cur=el.value,first=el.options[0].outerHTML;
   el.innerHTML=first+[...new Set(vals.filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt")).map(v=>`<option>${esc(v)}</option>`).join("");
   el.value=[...el.options].some(o=>o.value===cur)?cur:"";
 }
+let vista="C";
+function fimAlerta(d){return d<=45?45:d<=60?60:90}
+function alertas(){
+  const L=[];
+  items.filter(i=>i.estado!=="cancelado").forEach(i=>{
+    if(Number(i.period)>=12){const p=proxima(i),d=dias(p);if(d!==null&&d>=0&&d<=90)L.push({d,lv:fimAlerta(d),t:`<b>${esc(i.fornecedor)}</b> (${esc(i.cliente)}${i.espaco?" · "+esc(i.espaco):""}): renovação ${i.period==24?"bianual":"anual"} em <b>${d} dias</b> (${fd(p)})`})}
+    if(i.fidel){const d=dias(i.fidel);if(d!==null&&d>=0&&d<=90)L.push({d,lv:fimAlerta(d),t:`<b>${esc(i.fornecedor)}</b> (${esc(i.cliente)}${i.espaco?" · "+esc(i.espaco):""}): fim de contrato/fidelização em <b>${d} dias</b> (${fd(i.fidel)})`})}
+  });
+  L.sort((a,b)=>a.d-b.d);
+  $("alertas").innerHTML=L.length?`<div class="al"><h3>⏰ Renovações e fins de contrato a chegar (alertas aos 90, 60 e 45 dias)</h3>${L.map(x=>`<div><span class="lv${x.lv}">${x.lv===45?"🔴 ≤45 dias":x.lv===60?"🟠 ≤60 dias":"🟡 ≤90 dias"}</span> · ${x.t}</div>`).join("")}</div>`:"";
+}
+function renderForn(){
+  const g={};filtered().forEach(i=>{const k=(i.fornecedor||"").trim();(g[k]=g[k]||[]).push(i)});
+  const ks=Object.keys(g).sort((a,b)=>a.localeCompare(b,"pt"));
+  $("forn").innerHTML=ks.length?ks.map(k=>{
+    const a=g[k],m=a.filter(i=>i.estado!=="cancelado").reduce((s,i)=>s+mensal(i),0);
+    return `<details class="sup"><summary><span>${esc(k)} <span class="sub">· ${a.length} contrato(s)</span></span><span>${eur(m)}/mês <button class="sm" type="button" data-cp="${esc(k)}">Copiar p/ negociação</button></span></summary><div class="in"><table><thead><tr><th>Cliente</th><th>Corresponde a</th><th>Localização</th><th>CPE / ponto</th><th>Contrato</th><th>Potência</th><th>Tarifa</th><th>Consumo médio</th><th>Preço un.</th><th>Valor</th><th>Renovação</th><th>Fidelização</th></tr></thead><tbody>${a.map(i=>`<tr data-id="${esc(i.id)}" style="cursor:pointer"><td>${esc(i.cliente)}</td><td>${esc(i.espaco)||"—"}</td><td>${esc(i.local)}</td><td style="white-space:nowrap"><b>${esc(i.cpe)||"—"}</b></td><td>${esc(i.contrato)}</td><td>${i.potencia!==""?i.potencia+" kVA":"—"}</td><td>${esc(i.tarifa)||"—"}</td><td>${i.consumo!==""?i.consumo:"—"}</td><td>${i.preco_un!==""?Number(i.preco_un).toLocaleString("pt-PT",{minimumFractionDigits:4}):"—"}</td><td class="n">${eur(i.valor)}</td><td>${fd(proxima(i))}</td><td>${fd(i.fidel)}</td></tr>`).join("")}</tbody></table></div></details>`}).join(""):'<div class="empty">Sem resultados.</div>';
+}
+$("forn").onclick=async e=>{
+  const b=e.target.closest("button");
+  if(b&&b.dataset.cp){e.preventDefault();e.stopPropagation();
+    const a=filtered().filter(i=>(i.fornecedor||"").trim()===b.dataset.cp);
+    const h=["Fornecedor","Cliente","Corresponde a","Localização","CPE / ponto","Contrato","Potência kVA","Tarifa","Consumo médio","Preço un.","Valor","Periodicidade (meses)","Próxima renovação","Fim fidelização"];
+    const r=a.map(i=>[i.fornecedor,i.cliente,i.espaco,i.local,i.cpe,i.contrato,i.potencia,i.tarifa,i.consumo,String(i.preco_un).replace(".",","),String(i.valor).replace(".",","),i.period,proxima(i),i.fidel].map(v=>v??"").join("\t"));
+    try{await navigator.clipboard.writeText([h.join("\t"),...r].join("\n"));toast("Copiado — cole no Excel")}catch{toast("Não foi possível copiar")}
+    return}
+  const tr=e.target.closest("tr[data-id]");if(tr)openDlg(items.find(i=>i.id===tr.dataset.id));
+};
+function setVista(v){vista=v;$("vC").classList.toggle("on",v==="C");$("vF").classList.toggle("on",v==="F");$("twC").style.display=v==="C"?"":"none";$("forn").style.display=v==="F"?"":"none";$("chips").style.display=v==="C"?"":"none"}
+$("vC").onclick=()=>setVista("C");$("vF").onclick=()=>setVista("F");
 function render(){
+  alertas();renderForn();
   fillSel("fCli",items.map(i=>i.cliente));fillSel("fUti",items.map(i=>i.utilizador));fillSel("fEsp",items.map(i=>i.espaco));$("dlUti").innerHTML=[...new Set(items.map(i=>i.utilizador).filter(Boolean))].map(v=>`<option value="${esc(v)}">`).join("");fillSel("fFor",items.map(i=>i.fornecedor));fillSel("fCat",items.map(i=>i.categoria));fillSel("fPag",items.map(i=>i.pag));
   $("fCat").value=catF;
   const all=items.filter(i=>i.estado!=="cancelado");
@@ -245,10 +287,10 @@ function render(){
   $("tb").innerHTML=rows.map(i=>{
     const p=proxima(i),d=dias(p);
     const cls=i.estado==="cancelado"?"":d<=7?"x":d<=30?"s":"o";
-    const per={1:"mês",2:"bimestre",3:"trimestre",6:"semestre",12:"ano"}[i.period]||"";
+    const per={1:"mês",2:"bimestre",3:"trimestre",6:"semestre",12:"ano",24:"2 anos"}[i.period]||"";
     return `<tr data-id="${esc(i.id)}" style="cursor:pointer;${i.estado==="cancelado"?"opacity:.5":""}">
       <td><span class="tag">${esc(i.categoria)}</span></td>
-      <td><b>${esc(i.fornecedor)}</b><div class="sub">${esc(i.servico)}${i.contrato?" · "+esc(i.contrato):""}</div><div class="sub">${det(i)}</div></td>
+      <td><b>${esc(i.fornecedor)}</b><div class="sub">${esc(i.servico)}${i.contrato?" · "+esc(i.contrato):""}</div>${i.cpe?`<div class="sub">CPE/ponto: ${esc(i.cpe)}</div>`:""}<div class="sub">${det(i)}</div></td>
       <td>${esc(i.cliente)}${i.utilizador?`<div class="sub">Usa: <b>${esc(i.utilizador)}</b></div>`:""}${i.acao_pendente?`<div class="sub" style="color:var(--warn)">⚠ ${esc(i.acao_pendente)}</div>`:""}</td><td>${i.espaco?`<span class="tag" style="font-weight:600">${esc(i.espaco)}</span><div class="sub">${esc(i.local)}</div>`:(esc(i.local)||"—")}</td>
       <td class="n"><b>${eur(i.valor)}</b><div class="sub">/${per}${i.iva==="nao"?" + IVA":""}</div></td>
       <td>${esc(i.pag)}<div class="sub">${esc(i.origem)}</div></td>
@@ -262,7 +304,7 @@ $("fCat").oninput=()=>{catF=$("fCat").value;render()};
 $("bClr").onclick=()=>{["q","fEst","fPag","fCli","fUti","fEsp","fFor","fPer","fFid"].forEach(id=>$(id).value="");catF="";render()};
 
 const DET=["potencia","tarifa","consumo","preco_un","velocidade","canais","capital","franquia"];
-const F=["espaco","utilizador","acao_pendente","categoria","fornecedor","servico","cliente","local","contrato","valor","period","iva","pag","origem","renov","aviso","fidel","estado","notas",...DET];
+const F=["cpe","espaco","utilizador","acao_pendente","categoria","fornecedor","servico","cliente","local","contrato","valor","period","iva","pag","origem","renov","aviso","fidel","estado","notas",...DET];
 function updDet(){const c=$("categoria").value;DET.forEach(k=>{const w=$("w_"+k);w.style.display=w.dataset.cats.split("|").includes(c)?"":"none"})}
 $("categoria").addEventListener("change",updDet);
 var openDlg=function(it){
@@ -292,8 +334,8 @@ const sb=supabase.createClient(SB_URL,SB_KEY);
 let papel=null,meEmail="",signup=false,chan=null;
 const canEdit=()=>papel==="admin"||papel==="editor";
 const num=v=>v===""||v==null?null:Number(v);
-const fromRow=r=>({id:r.id,categoria:r.categoria,fornecedor:r.fornecedor,servico:r.servico||"",cliente:r.cliente,local:r.localizacao||"",contrato:r.contrato||"",valor:Number(r.valor),period:String(r.periodicidade_meses),iva:r.iva_incluido?"sim":"nao",pag:r.forma_pagamento,origem:r.origem_pagamento,renov:r.data_renovacao,aviso:r.aviso_dias??"",fidel:r.fim_fidelizacao||"",estado:r.estado,notas:r.notas||"",espaco:r.espaco||"",utilizador:r.utilizador||"",acao_pendente:r.acao_pendente||"",potencia:r.potencia_kva??"",tarifa:r.tarifa||"",consumo:r.consumo_medio??"",preco_un:r.preco_unitario??"",velocidade:r.velocidade||"",canais:r.canais_linhas||"",capital:r.capital_seguro??"",franquia:r.franquia??"",por:r.atualizado_por||r.criado_por});
-const toRow=o=>({categoria:o.categoria,fornecedor:o.fornecedor,servico:o.servico||null,cliente:o.cliente,localizacao:o.local||null,contrato:o.contrato||null,valor:o.valor,periodicidade_meses:Number(o.period),iva_incluido:o.iva==="sim",forma_pagamento:o.pag,origem_pagamento:o.origem,data_renovacao:o.renov,aviso_dias:o.aviso===""?null:Number(o.aviso),fim_fidelizacao:o.fidel||null,estado:o.estado,notas:o.notas||null,espaco:o.espaco||null,utilizador:o.utilizador||null,acao_pendente:o.acao_pendente||null,potencia_kva:num(o.potencia),tarifa:o.tarifa||null,consumo_medio:num(o.consumo),preco_unitario:num(o.preco_un),velocidade:o.velocidade||null,canais_linhas:o.canais||null,capital_seguro:num(o.capital),franquia:num(o.franquia)});
+const fromRow=r=>({id:r.id,categoria:r.categoria,fornecedor:r.fornecedor,servico:r.servico||"",cliente:r.cliente,local:r.localizacao||"",contrato:r.contrato||"",valor:Number(r.valor),period:String(r.periodicidade_meses),iva:r.iva_incluido?"sim":"nao",pag:r.forma_pagamento,origem:r.origem_pagamento,renov:r.data_renovacao,aviso:r.aviso_dias??"",fidel:r.fim_fidelizacao||"",estado:r.estado,notas:r.notas||"",cpe:r.cpe||"",espaco:r.espaco||"",utilizador:r.utilizador||"",acao_pendente:r.acao_pendente||"",potencia:r.potencia_kva??"",tarifa:r.tarifa||"",consumo:r.consumo_medio??"",preco_un:r.preco_unitario??"",velocidade:r.velocidade||"",canais:r.canais_linhas||"",capital:r.capital_seguro??"",franquia:r.franquia??"",por:r.atualizado_por||r.criado_por});
+const toRow=o=>({categoria:o.categoria,fornecedor:o.fornecedor,servico:o.servico||null,cliente:o.cliente,localizacao:o.local||null,contrato:o.contrato||null,valor:o.valor,periodicidade_meses:Number(o.period),iva_incluido:o.iva==="sim",forma_pagamento:o.pag,origem_pagamento:o.origem,data_renovacao:o.renov,aviso_dias:o.aviso===""?null:Number(o.aviso),fim_fidelizacao:o.fidel||null,estado:o.estado,notas:o.notas||null,cpe:o.cpe||null,espaco:o.espaco||null,utilizador:o.utilizador||null,acao_pendente:o.acao_pendente||null,potencia_kva:num(o.potencia),tarifa:o.tarifa||null,consumo_medio:num(o.consumo),preco_unitario:num(o.preco_un),velocidade:o.velocidade||null,canais_linhas:o.canais||null,capital_seguro:num(o.capital),franquia:num(o.franquia)});
 
 async function load(){
   const {data,error}=await sb.from("subscricoes").select("*").order("data_renovacao");
