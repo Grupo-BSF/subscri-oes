@@ -163,6 +163,7 @@ tr.dt .ed{margin-top:12px}
   <div class="bar" id="more" style="display:none">
     <select id="fUti"><option value="">Quem usa: todos</option></select>
     <select id="fCat"><option value="">Categoria: todas</option></select>
+    <select id="fSub"><option value="">Tipo de serviço: todos</option></select>
     <select id="fPer"><option value="">Tipo: mensal e anual</option><option value="1">Mensal</option><option value="2">Bimestral</option><option value="3">Trimestral</option><option value="6">Semestral</option><option value="12">Anual</option><option value="24">Bianual (2 anos)</option></select>
     <select id="fFid"><option value="">Fidelização: todas</option><option value="sem">Sem fidelização</option><option value="com">Com fidelização</option></select>
     <select id="fEst"><option value="">Estado: todos</option><option value="pend">Com ações a tratar</option><option value="ativo">Ativos</option><option value="cancelar">A cancelar</option><option value="cancelado">Cancelados</option></select>
@@ -203,8 +204,9 @@ tr.dt .ed{margin-top:12px}
     <div id="w_tarifa" data-cats="Eletricidade"><label>Tarifa</label><select id="tarifa"><option value=""></option><option>Simples</option><option>Bi-horária</option><option>Tri-horária</option><option>Outra</option></select></div>
     <div id="w_consumo" data-cats="Eletricidade|Gás|Água"><label>Consumo médio mensal (kWh ou m³)</label><input id="consumo" type="number" step="0.01" min="0"></div>
     <div id="w_preco_un" data-cats="Eletricidade|Gás|Água"><label>Preço por kWh ou m³ (€)</label><input id="preco_un" type="number" step="0.0001" min="0"></div>
-    <div id="w_velocidade" data-cats="Telecomunicações|Pacote completo (net + TV + voz)"><label>Velocidade internet</label><input id="velocidade" placeholder="Ex.: 1 Gb, 500 Mb"></div>
-    <div id="w_canais" data-cats="Telecomunicações|Pacote completo (net + TV + voz)"><label>Canais / linhas / telemóveis</label><input id="canais" placeholder="Ex.: 160 canais, 2 telemóveis"></div>
+    <div id="w_subcategoria" data-cats="Telecomunicações"><label>Tipo de serviço (subcategoria)</label><select id="subcategoria"><option value=""></option></select></div>
+    <div id="w_velocidade" data-cats="Telecomunicações"><label>Velocidade internet</label><input id="velocidade" placeholder="Ex.: 1 Gb, 500 Mb"></div>
+    <div id="w_canais" data-cats="Telecomunicações"><label>Canais / linhas / telemóveis</label><input id="canais" placeholder="Ex.: 160 canais, 2 telemóveis"></div>
     <div id="w_capital" data-cats="Seguros"><label>Capital seguro (€)</label><input id="capital" type="number" step="0.01" min="0"></div>
     <div id="w_franquia" data-cats="Seguros"><label>Franquia (€)</label><input id="franquia" type="number" step="0.01" min="0"></div>
     <div class="f"><label>⚠ A tratar (alterações a pedir ao fornecedor)</label><textarea id="acao_pendente" rows="2" placeholder="Ex.: alterar titular de S.A. para Lda, atualizar morada"></textarea></div>
@@ -258,7 +260,8 @@ tr.dt .ed{margin-top:12px}
 <div id="toast"></div>
 
 <script>
-const CATS=["Telecomunicações","Pacote completo (net + TV + voz)","Alarmes / Segurança","Seguros","Eletricidade","Água","Gás","Software / Online","Outro"];
+const CATS=["Telecomunicações","Alarmes / Segurança","Seguros","Eletricidade","Água","Gás","Software / Online","Outro"];
+const SUBS=["Internet","Telefone","TV","Pacote completo"];
 const PAGS=["Débito direto","Cartão de crédito","Cartão de débito","Transferência bancária","Referência Multibanco","Numerário","Outra"];
 const $=id=>document.getElementById(id);
 const eur=n=>new Intl.NumberFormat("pt-PT",{style:"currency",currency:"EUR"}).format(n||0);
@@ -267,6 +270,7 @@ const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&g
 let items=[],col=null,editing=null,sortK="renov",sortD=1,catF="",persist=false;
 
 CATS.forEach(c=>$("categoria").insertAdjacentHTML("beforeend",`<option>${c}</option>`));
+SUBS.forEach(c=>$("subcategoria").insertAdjacentHTML("beforeend",`<option>${c}</option>`));
 PAGS.forEach(c=>$("pag").insertAdjacentHTML("beforeend",`<option>${c}</option>`));
 
 function det(i){
@@ -296,11 +300,11 @@ $("thead").innerHTML=COLS.map(([k,l])=>`<th data-k="${k}">${l}</th>`).join("");
 $("thead").onclick=e=>{const k=e.target.dataset?.k;if(!k)return;sortD=sortK===k?-sortD:1;sortK=k;render()};
 
 function filtered(){
-  const q=$("q").value.toLowerCase(),e=$("fEst").value,p=$("fPag").value,cl=$("fCli").value,ut=$("fUti").value,es=$("fEsp").value,fo=$("fFor").value,pe=$("fPer").value,fi=$("fFid").value;
+  const q=$("q").value.toLowerCase(),e=$("fEst").value,p=$("fPag").value,cl=$("fCli").value,ut=$("fUti").value,es=$("fEsp").value,fo=$("fFor").value,pe=$("fPer").value,fi=$("fFid").value,sb2=$("fSub").value;
   const hoje=new Date().toISOString().slice(0,10);
-  return items.filter(i=>(!catF||i.categoria===catF)&&(!e||(e==="pend"?!!i.acao_pendente:i.estado===e))&&(!p||i.pag===p)&&(!cl||i.cliente===cl)&&(!ut||(i.utilizador||"")===ut)&&(!es||(i.espaco||"")===es)&&(!fo||i.fornecedor===fo)&&(!pe||String(i.period)===pe)&&
+  return items.filter(i=>(!catF||i.categoria===catF)&&(!e||(e==="pend"?!!i.acao_pendente:i.estado===e))&&(!p||i.pag===p)&&(!cl||i.cliente===cl)&&(!ut||(i.utilizador||"")===ut)&&(!es||(i.espaco||"")===es)&&(!sb2||i.subcategoria===sb2)&&(!fo||i.fornecedor===fo)&&(!pe||String(i.period)===pe)&&
     (!fi||(fi==="com"?(i.fidel&&i.fidel>=hoje):!(i.fidel&&i.fidel>=hoje)))&&
-    (!q||[i.fornecedor,i.servico,i.cliente,i.cpe,i.espaco,i.local,i.origem,i.contrato,i.notas,i.categoria].join(" ").toLowerCase().includes(q)));
+    (!q||[i.fornecedor,i.servico,i.cliente,i.cpe,i.espaco,i.local,i.origem,i.contrato,i.notas,i.categoria,i.subcategoria].join(" ").toLowerCase().includes(q)));
 }
 function fillSel(id,vals){
   const el=$(id),cur=el.value,first=el.options[0].outerHTML;
@@ -351,7 +355,7 @@ function setVista(v){vista=v;$("vC").classList.toggle("on",v==="C");$("vF").clas
 $("vC").onclick=()=>setVista("C");$("vF").onclick=()=>setVista("F");
 function render(){
   alertas();renderForn();
-  fillSel("fCli",items.map(i=>i.cliente));fillSel("fUti",items.map(i=>i.utilizador));fillSel("fEsp",items.map(i=>i.espaco));$("dlUti").innerHTML=[...new Set(items.map(i=>i.utilizador).filter(Boolean))].map(v=>`<option value="${esc(v)}">`).join("");fillSel("fFor",items.map(i=>i.fornecedor));fillSel("fCat",items.map(i=>i.categoria));fillSel("fPag",items.map(i=>i.pag));
+  fillSel("fCli",items.map(i=>i.cliente));fillSel("fUti",items.map(i=>i.utilizador));fillSel("fEsp",items.map(i=>i.espaco));$("dlUti").innerHTML=[...new Set(items.map(i=>i.utilizador).filter(Boolean))].map(v=>`<option value="${esc(v)}">`).join("");fillSel("fFor",items.map(i=>i.fornecedor));fillSel("fCat",items.map(i=>i.categoria));fillSel("fSub",items.map(i=>i.subcategoria));fillSel("fPag",items.map(i=>i.pag));
   $("fCat").value=catF;
   const all=items.filter(i=>i.estado!=="cancelado");
   const act=filtered().filter(i=>i.estado!=="cancelado");
@@ -380,7 +384,7 @@ function render(){
     const open=openRows.has(i.id);
     const est=i.estado==="cancelar"?' <span class="badge w">A cancelar</span>':cx?' <span class="badge n">Cancelado</span>':"";
     return `<tr class="r${cx?" cx":""}" data-id="${esc(i.id)}">
-      <td><b>${esc(i.fornecedor)}</b>${est}<div class="sub"><span class="tag">${esc(i.categoria)}</span> ${esc(i.servico)}</div></td>
+      <td><b>${esc(i.fornecedor)}</b>${est}<div class="sub"><span class="tag">${esc(i.categoria)}${i.subcategoria?" · "+esc(i.subcategoria):""}</span> ${esc(i.servico)}</div></td>
       <td><b>${esc(i.cliente)}</b>${i.acao_pendente?' <span class="badge w" title="'+esc(i.acao_pendente)+'">⚠ a tratar</span>':""}<div class="sub">${i.espaco?`<span class="tag" style="font-weight:600">${esc(i.espaco)}</span> `:""}${i.utilizador?"usa: "+esc(i.utilizador):""}</div></td>
       <td class="n"><b>${eur(i.valor)}</b><div class="sub">/${PER[i.period]||""}${i.iva==="nao"?" + IVA":""}${Number(i.period)>1?" · ≈ "+eur(mensal(i))+"/mês":""}</div></td>
       <td><b>${fd(p)}</b><div>${dTxt?`<span class="badge ${cls}">${dTxt}</span>`:""}</div>${i.fidel?`<div class="sub">fidelização até ${fd(i.fidel)}</div>`:""}</td></tr>
@@ -405,20 +409,21 @@ function dtc(s){return s?new Date(s+"T00:00:00"):null}
 $("bXls").onclick=()=>{
   if(typeof XLSX==="undefined"){toast("Não foi possível carregar o gerador de Excel");return}
   const rows=filtered().sort((a,b)=>(a.categoria+a.fornecedor).localeCompare(b.categoria+b.fornecedor,"pt"));
-  const H=["Categoria","Fornecedor","Serviço / plano","Cliente (titular)","Corresponde a","Quem usa","Localização","Nº contrato / cliente","CPE / ponto / contador","Valor (€)","Periodicidade","Equivalente mensal (€)","Equivalente anual (€)","IVA incluído","Forma de pagamento","Origem do dinheiro","Próxima renovação","Aviso prévio (dias)","Fim fidelização","Estado","Potência (kVA)","Tarifa","Consumo médio","Preço unitário (€)","Velocidade","Canais / linhas","Capital seguro (€)","Franquia (€)","A tratar","Notas"];
+  const H=["Categoria","Tipo de serviço","Fornecedor","Serviço / plano","Cliente (titular)","Corresponde a","Quem usa","Localização","Nº contrato / cliente","CPE / ponto / contador","Valor (€)","Periodicidade","Equivalente mensal (€)","Equivalente anual (€)","IVA incluído","Forma de pagamento","Origem do dinheiro","Próxima renovação","Aviso prévio (dias)","Fim fidelização","Estado","Potência (kVA)","Tarifa","Consumo médio","Preço unitário (€)","Velocidade","Canais / linhas","Capital seguro (€)","Franquia (€)","A tratar","Notas"];
   const nn=v=>v===""||v==null?null:Number(v);
-  const data=rows.map(i=>[i.categoria,i.fornecedor,i.servico,i.cliente,i.espaco,i.utilizador,i.local,i.contrato,i.cpe,Number(i.valor),({1:"Mensal",2:"Bimestral",3:"Trimestral",6:"Semestral",12:"Anual",24:"Bianual"})[i.period]||i.period,Math.round(mensal(i)*100)/100,Math.round(mensal(i)*1200)/100,i.iva==="sim"?"Sim":"Não",i.pag,i.origem,dtc(proxima(i)),nn(i.aviso),dtc(i.fidel),({ativo:"Ativo",cancelar:"A cancelar",cancelado:"Cancelado"})[i.estado]||i.estado,nn(i.potencia),i.tarifa,nn(i.consumo),nn(i.preco_un),i.velocidade,i.canais,nn(i.capital),nn(i.franquia),i.acao_pendente,i.notas].map(v=>v===""||v===undefined?null:v));
+  const data=rows.map(i=>[i.categoria,i.subcategoria,i.fornecedor,i.servico,i.cliente,i.espaco,i.utilizador,i.local,i.contrato,i.cpe,Number(i.valor),({1:"Mensal",2:"Bimestral",3:"Trimestral",6:"Semestral",12:"Anual",24:"Bianual"})[i.period]||i.period,Math.round(mensal(i)*100)/100,Math.round(mensal(i)*1200)/100,i.iva==="sim"?"Sim":"Não",i.pag,i.origem,dtc(proxima(i)),nn(i.aviso),dtc(i.fidel),({ativo:"Ativo",cancelar:"A cancelar",cancelado:"Cancelado"})[i.estado]||i.estado,nn(i.potencia),i.tarifa,nn(i.consumo),nn(i.preco_un),i.velocidade,i.canais,nn(i.capital),nn(i.franquia),i.acao_pendente,i.notas].map(v=>v===""||v===undefined?null:v));
   const ws=XLSX.utils.aoa_to_sheet([H,...data],{cellDates:true});
-  ws["!cols"]=H.map((h,k)=>({wch:[16,22,28,26,16,16,30,24,28,10,12,12,12,8,20,30,13,10,13,11,9,12,10,10,12,16,10,10,36,50][k]||14}));
+  ws["!cols"]=H.map((h,k)=>({wch:[16,14,22,28,26,16,16,30,24,28,10,12,12,12,8,20,30,13,10,13,11,9,12,10,10,12,16,10,10,36,50][k]||14}));
   ws["!freeze"]={xSplit:2,ySplit:1};ws["!views"]=[{state:"frozen",xSplit:2,ySplit:1}];
   ws["!autofilter"]={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:data.length,c:H.length-1}})};
-  data.forEach((_,r)=>{[9,11,12,23,26,27].forEach(c=>{const cell=ws[XLSX.utils.encode_cell({r:r+1,c})];if(cell&&cell.t==="n")cell.z=c===23?"0.0000":"#,##0.00"});[16,18].forEach(c=>{const cell=ws[XLSX.utils.encode_cell({r:r+1,c})];if(cell)cell.z="dd/mm/yyyy"})});
+  data.forEach((_,r)=>{[10,12,13,24,27,28].forEach(c=>{const cell=ws[XLSX.utils.encode_cell({r:r+1,c})];if(cell&&cell.t==="n")cell.z=c===24?"0.0000":"#,##0.00"});[17,19].forEach(c=>{const cell=ws[XLSX.utils.encode_cell({r:r+1,c})];if(cell)cell.z="dd/mm/yyyy"})});
   const act=rows.filter(i=>i.estado!=="cancelado");
   const grp=(k)=>{const g={};act.forEach(i=>{const x=i[k]||"(sem indicação)";(g[x]=g[x]||[]).push(i)});return Object.keys(g).sort((a,b)=>a.localeCompare(b,"pt")).map(x=>{const m=g[x].reduce((s,i)=>s+mensal(i),0);return [x,g[x].length,Math.round(m*100)/100,Math.round(m/g[x].length*100)/100,Math.round(m*1200)/100]})};
   const sumSheet=(lbl,k)=>{const r=grp(k);const w=XLSX.utils.aoa_to_sheet([[lbl,"Nº contratos","Total mensal (€)","Média mensal por contrato (€)","Total anual (€)"],...r,["TOTAL",act.length,Math.round(act.reduce((s,i)=>s+mensal(i),0)*100)/100,null,Math.round(act.reduce((s,i)=>s+mensal(i),0)*1200)/100]]);w["!cols"]=[{wch:34},{wch:12},{wch:16},{wch:28},{wch:16}];return w};
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,"Contratos");
   XLSX.utils.book_append_sheet(wb,sumSheet("Categoria","categoria"),"Por categoria");
+  XLSX.utils.book_append_sheet(wb,sumSheet("Tipo de serviço","subcategoria"),"Por tipo de serviço");
   XLSX.utils.book_append_sheet(wb,sumSheet("Fornecedor","fornecedor"),"Por fornecedor");
   XLSX.utils.book_append_sheet(wb,sumSheet("Corresponde a","espaco"),"Por espaço");
   XLSX.utils.book_append_sheet(wb,sumSheet("Cliente (titular)","cliente"),"Por cliente");
@@ -426,11 +431,11 @@ $("bXls").onclick=()=>{
   toast("Excel gerado ("+rows.length+" contratos)");
 };
 $("bMore").onclick=()=>{const m=$("more"),o=m.style.display==="none";m.style.display=o?"":"none";$("bMore").textContent=o?"Menos filtros ▴":"Mais filtros ▾"};
-["q","fEst","fPag","fCli","fUti","fEsp","fFor","fPer","fFid"].forEach(id=>$(id).oninput=render);
+["q","fEst","fPag","fCli","fUti","fEsp","fFor","fPer","fFid","fSub"].forEach(id=>$(id).oninput=render);
 $("fCat").oninput=()=>{catF=$("fCat").value;render()};
-$("bClr").onclick=()=>{["q","fEst","fPag","fCli","fUti","fEsp","fFor","fPer","fFid"].forEach(id=>$(id).value="");catF="";render()};
+$("bClr").onclick=()=>{["q","fEst","fPag","fCli","fUti","fEsp","fFor","fPer","fFid","fSub"].forEach(id=>$(id).value="");catF="";render()};
 
-const DET=["potencia","tarifa","consumo","preco_un","velocidade","canais","capital","franquia"];
+const DET=["subcategoria","potencia","tarifa","consumo","preco_un","velocidade","canais","capital","franquia"];
 const F=["cpe","espaco","utilizador","acao_pendente","categoria","fornecedor","servico","cliente","local","contrato","valor","period","iva","pag","origem","renov","aviso","fidel","estado","notas",...DET];
 function updDet(){const c=$("categoria").value;DET.forEach(k=>{const w=$("w_"+k);w.style.display=w.dataset.cats.split("|").includes(c)?"":"none"})}
 $("categoria").addEventListener("change",updDet);
@@ -461,8 +466,8 @@ const sb=supabase.createClient(SB_URL,SB_KEY);
 let papel=null,meEmail="",signup=false,chan=null;
 const canEdit=()=>papel==="admin"||papel==="editor";
 const num=v=>v===""||v==null?null:Number(v);
-const fromRow=r=>({id:r.id,categoria:r.categoria,fornecedor:r.fornecedor,servico:r.servico||"",cliente:r.cliente,local:r.localizacao||"",contrato:r.contrato||"",valor:Number(r.valor),period:String(r.periodicidade_meses),iva:r.iva_incluido?"sim":"nao",pag:r.forma_pagamento,origem:r.origem_pagamento,renov:r.data_renovacao,aviso:r.aviso_dias??"",fidel:r.fim_fidelizacao||"",estado:r.estado,notas:r.notas||"",cpe:r.cpe||"",espaco:r.espaco||"",utilizador:r.utilizador||"",acao_pendente:r.acao_pendente||"",potencia:r.potencia_kva??"",tarifa:r.tarifa||"",consumo:r.consumo_medio??"",preco_un:r.preco_unitario??"",velocidade:r.velocidade||"",canais:r.canais_linhas||"",capital:r.capital_seguro??"",franquia:r.franquia??"",por:r.atualizado_por||r.criado_por});
-const toRow=o=>({categoria:o.categoria,fornecedor:o.fornecedor,servico:o.servico||null,cliente:o.cliente,localizacao:o.local||null,contrato:o.contrato||null,valor:o.valor,periodicidade_meses:Number(o.period),iva_incluido:o.iva==="sim",forma_pagamento:o.pag,origem_pagamento:o.origem,data_renovacao:o.renov,aviso_dias:o.aviso===""?null:Number(o.aviso),fim_fidelizacao:o.fidel||null,estado:o.estado,notas:o.notas||null,cpe:o.cpe||null,espaco:o.espaco||null,utilizador:o.utilizador||null,acao_pendente:o.acao_pendente||null,potencia_kva:num(o.potencia),tarifa:o.tarifa||null,consumo_medio:num(o.consumo),preco_unitario:num(o.preco_un),velocidade:o.velocidade||null,canais_linhas:o.canais||null,capital_seguro:num(o.capital),franquia:num(o.franquia)});
+const fromRow=r=>({id:r.id,categoria:r.categoria,fornecedor:r.fornecedor,servico:r.servico||"",cliente:r.cliente,local:r.localizacao||"",contrato:r.contrato||"",valor:Number(r.valor),period:String(r.periodicidade_meses),iva:r.iva_incluido?"sim":"nao",pag:r.forma_pagamento,origem:r.origem_pagamento,renov:r.data_renovacao,aviso:r.aviso_dias??"",fidel:r.fim_fidelizacao||"",estado:r.estado,notas:r.notas||"",cpe:r.cpe||"",espaco:r.espaco||"",utilizador:r.utilizador||"",acao_pendente:r.acao_pendente||"",potencia:r.potencia_kva??"",tarifa:r.tarifa||"",consumo:r.consumo_medio??"",preco_un:r.preco_unitario??"",subcategoria:r.subcategoria||"",velocidade:r.velocidade||"",canais:r.canais_linhas||"",capital:r.capital_seguro??"",franquia:r.franquia??"",por:r.atualizado_por||r.criado_por});
+const toRow=o=>({categoria:o.categoria,fornecedor:o.fornecedor,servico:o.servico||null,cliente:o.cliente,localizacao:o.local||null,contrato:o.contrato||null,valor:o.valor,periodicidade_meses:Number(o.period),iva_incluido:o.iva==="sim",forma_pagamento:o.pag,origem_pagamento:o.origem,data_renovacao:o.renov,aviso_dias:o.aviso===""?null:Number(o.aviso),fim_fidelizacao:o.fidel||null,estado:o.estado,notas:o.notas||null,cpe:o.cpe||null,espaco:o.espaco||null,utilizador:o.utilizador||null,acao_pendente:o.acao_pendente||null,potencia_kva:num(o.potencia),tarifa:o.tarifa||null,consumo_medio:num(o.consumo),preco_unitario:num(o.preco_un),subcategoria:o.subcategoria||null,velocidade:o.velocidade||null,canais_linhas:o.canais||null,capital_seguro:num(o.capital),franquia:num(o.franquia)});
 
 async function load(){
   const {data,error}=await sb.from("subscricoes").select("*").order("data_renovacao");
