@@ -130,6 +130,30 @@ tr.dt .ed{margin-top:12px}
   .tag,.badge{border:1px solid #999;background:none!important;color:#000!important}
   .sub{color:#333!important}
 }
+
+.selbar{position:sticky;top:0;z-index:5;display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--acc);color:#fff;padding:8px 12px;border-radius:10px;margin-bottom:10px}
+.selbar button{background:#fff;color:var(--ink);border-color:#fff}
+.selbar button.gh{background:transparent;color:#fff;border-color:#ffffff66}
+tr.r.sl td{background:color-mix(in srgb,var(--acc) 9%,transparent)}
+input.sel{width:16px;height:16px;vertical-align:-3px;margin-right:4px;cursor:pointer}
+#cmp{position:fixed;inset:0;z-index:50;background:var(--bg);overflow:auto;padding:16px 18px}
+#cmp .top{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+#cmp h2{margin:0;font-size:18px;flex:1}
+#cmp table{border-collapse:collapse;min-width:100%;background:var(--card)}
+#cmp th,#cmp td{border:1px solid var(--line);padding:6px 9px;vertical-align:top;font-size:13.5px;text-align:left;min-width:170px;max-width:300px;word-break:break-word}
+#cmp th.l,#cmp td.l{min-width:130px;max-width:150px;color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.03em;position:sticky;left:0;background:var(--card)}
+#cmp tr.df td:not(.l){background:#fff4cc;font-weight:600}
+#cmp .leg{font-size:13px;color:var(--mut);margin-bottom:10px}
+@media print{
+  body.cmpopen>*:not(#cmp){display:none!important}
+  #cmp{position:static;overflow:visible;padding:0;background:#fff}
+  #cmp .noprint{display:none!important}
+  #cmp th,#cmp td{font-size:10px;padding:3px 5px;min-width:0;max-width:none}
+  #cmp tr.df td:not(.l){background:#ffeaa0!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #cmp th.l,#cmp td.l{position:static}
+  body.selprint tr.r:not(.sl),body.selprint tr.dt:not(.sl){display:none!important}
+  .selbar{display:none!important}
+}
 </style>
 </head>
 <body>
@@ -157,6 +181,7 @@ tr.dt .ed{margin-top:12px}
     <select id="fCli"><option value="">Empresa / cliente: todos</option></select>
     <select id="fEsp"><option value="">Corresponde a: todos</option></select>
     <select id="fFor"><option value="">Fornecedor: todos</option></select>
+    <button id="bSelAll" class="sm" type="button" title="Seleciona todos os contratos que estão visíveis com os filtros atuais">☑ Selecionar visíveis</button>
     <button id="bMore" class="sm" type="button">Mais filtros ▾</button>
     <button id="bClr" class="sm gh" type="button">Limpar</button>
   </div>
@@ -169,6 +194,7 @@ tr.dt .ed{margin-top:12px}
     <select id="fEst"><option value="">Estado: todos</option><option value="pend">Com ações a tratar</option><option value="ativo">Ativos</option><option value="cancelar">A cancelar</option><option value="cancelado">Cancelados</option></select>
     <select id="fPag"><option value="">Pagamento: todos</option></select>
   </div>
+  <div id="selbar" class="selbar" style="display:none"><b id="selN"></b> <button id="bCmp" class="sm" type="button">⇄ Comparar</button> <button id="bPrintSel" class="sm" type="button">🖨 Imprimir selecionados</button> <button id="bClrSel" class="sm gh" type="button">Limpar seleção</button></div>
   <div id="forn" style="display:none"></div>
   <div class="tw" id="twC"><table>
     <thead><tr id="thead"></tr></thead>
@@ -295,7 +321,7 @@ function proxima(i){
 const COLS=[["fornecedor","Contrato"],["cliente","Cliente / Corresponde a"],["valor","Valor"],["renov","Renovação"]];
 const PER={1:"mês",2:"bimestre",3:"trimestre",6:"semestre",12:"ano",24:"2 anos"};
 const kv=(k,v)=>v!==""&&v!=null?`<div><div class="k">${k}</div><div>${v}</div></div>`:"";
-let openRows=new Set();
+let openRows=new Set(),sel=new Set();
 $("thead").innerHTML=COLS.map(([k,l])=>`<th data-k="${k}">${l}</th>`).join("");
 $("thead").onclick=e=>{const k=e.target.dataset?.k;if(!k)return;sortD=sortK===k?-sortD:1;sortK=k;render()};
 
@@ -383,12 +409,13 @@ function render(){
     const dTxt=d===null?"":d===0?"hoje":d>0?"em "+d+" dias":"";
     const open=openRows.has(i.id);
     const est=i.estado==="cancelar"?' <span class="badge w">A cancelar</span>':cx?' <span class="badge n">Cancelado</span>':"";
-    return `<tr class="r${cx?" cx":""}" data-id="${esc(i.id)}">
-      <td><b>${esc(i.fornecedor)}</b>${est}<div class="sub"><span class="tag">${esc(i.categoria)}${i.subcategoria?" · "+esc(i.subcategoria):""}</span> ${esc(i.servico)}</div></td>
+    const sl=sel.has(i.id);
+    return `<tr class="r${cx?" cx":""}${sl?" sl":""}" data-id="${esc(i.id)}">
+      <td><input type="checkbox" class="sel" data-s="${esc(i.id)}" ${sl?"checked":""} title="Selecionar para comparar / imprimir"> <b>${esc(i.fornecedor)}</b>${est}<div class="sub"><span class="tag">${esc(i.categoria)}${i.subcategoria?" · "+esc(i.subcategoria):""}</span> ${esc(i.servico)}</div></td>
       <td><b>${esc(i.cliente)}</b>${i.acao_pendente?' <span class="badge w" title="'+esc(i.acao_pendente)+'">⚠ a tratar</span>':""}<div class="sub">${i.espaco?`<span class="tag" style="font-weight:600">${esc(i.espaco)}</span> `:""}${i.utilizador?"usa: "+esc(i.utilizador):""}</div></td>
       <td class="n"><b>${eur(i.valor)}</b><div class="sub">/${PER[i.period]||""}${i.iva==="nao"?" + IVA":""}${Number(i.period)>1?" · ≈ "+eur(mensal(i))+"/mês":""}</div></td>
       <td><b>${fd(p)}</b><div>${dTxt?`<span class="badge ${cls}">${dTxt}</span>`:""}</div>${i.fidel?`<div class="sub">fidelização até ${fd(i.fidel)}</div>`:""}</td></tr>
-    <tr class="dt" data-for="${esc(i.id)}" style="display:${open?"":"none"}"><td colspan="4">
+    <tr class="dt${sl?" sl":""}" data-for="${esc(i.id)}" style="display:${open?"":"none"}"><td colspan="4">
       <div class="cg">${kv("Localização",esc(i.local))}${kv("Nº contrato / cliente",esc(i.contrato))}${kv("CPE / ponto / contador",esc(i.cpe))}${kv("Pagamento",esc(i.pag))}${kv("Origem do dinheiro",esc(i.origem))}${kv("Aviso prévio",i.aviso!==""?i.aviso+" dias":"")}${kv("Detalhes",det(i))}${kv("Notas",esc(i.notas))}</div>
       ${i.acao_pendente?`<div class="pend">⚠ A tratar: ${esc(i.acao_pendente)}</div>`:""}
       <button class="sm ed" type="button" data-ed="${esc(i.id)}">Editar</button>
@@ -396,6 +423,9 @@ function render(){
   const used=[...new Set(items.map(i=>i.pag))];
 }
 $("tb").onclick=e=>{
+  const cb=e.target.closest("input.sel");
+  if(cb){const id=cb.dataset.s;cb.checked?sel.add(id):sel.delete(id);
+    document.querySelectorAll('#tb tr[data-id="'+id+'"],#tb tr[data-for="'+id+'"]').forEach(r=>r.classList.toggle("sl",cb.checked));selUpd();return}
   const b=e.target.closest("button[data-ed]");
   if(b){openDlg(items.find(i=>i.id===b.dataset.ed));return}
   const tr=e.target.closest("tr.r");if(!tr)return;
@@ -429,6 +459,23 @@ $("bXls").onclick=()=>{
   XLSX.utils.book_append_sheet(wb,sumSheet("Cliente (titular)","cliente"),"Por cliente");
   XLSX.writeFile(wb,"subscricoes-"+new Date().toISOString().slice(0,10)+".xlsx",{cellDates:true});
   toast("Excel gerado ("+rows.length+" contratos)");
+};
+function selUpd(){const n=sel.size;$("selbar").style.display=n?"flex":"none";$("selN").textContent=n+" selecionado"+(n>1?"s":"")}
+$("bSelAll").onclick=()=>{filtered().forEach(i=>sel.add(i.id));render();selUpd()};
+$("bClrSel").onclick=()=>{sel.clear();render();selUpd()};
+$("bPrintSel").onclick=()=>{if(vista!=="C")setVista("C");document.body.classList.add("selprint");setTimeout(()=>{window.print();},50)};
+window.addEventListener("afterprint",()=>document.body.classList.remove("selprint"));
+$("bCmp").onclick=()=>{
+  const L=items.filter(i=>sel.has(i.id));if(L.length<2){toast("Seleciona pelo menos 2 contratos para comparar");return}
+  const mensalTxt=i=>eur(mensal(i));
+  const R=[["Fornecedor",i=>i.fornecedor],["Categoria / tipo",i=>i.categoria+(i.subcategoria?" · "+i.subcategoria:"")],["Cliente (titular)",i=>i.cliente],["Corresponde a",i=>i.espaco],["Quem usa",i=>i.utilizador],["Localização",i=>i.local],["Nº contrato / cliente",i=>i.contrato],["CPE / ponto / contador",i=>i.cpe],["Potência (kVA)",i=>i.potencia],["Tarifa",i=>i.tarifa],["Preço unitário (€)",i=>i.preco_un],["Consumo médio",i=>i.consumo],["Valor",i=>eur(i.valor)+" /"+(PER[i.period]||"")],["Equivalente mensal",mensalTxt],["Próxima renovação",i=>fd(proxima(i))],["Fim fidelização",i=>i.fidel?fd(i.fidel):""],["Aviso prévio (dias)",i=>i.aviso],["Forma de pagamento",i=>i.pag],["Origem do dinheiro",i=>i.origem],["Estado",i=>i.estado],["A tratar",i=>i.acao_pendente],["Notas",i=>i.notas]];
+  const norm=v=>String(v==null?"":v).replace(/\s+/g,"").toLowerCase();
+  const rows=R.map(([lab,f])=>{const vs=L.map(f);const df=new Set(vs.map(norm)).size>1;return `<tr class="${df?"df":""}"><td class="l">${lab}</td>${vs.map(v=>`<td>${esc(v==null?"":String(v))}</td>`).join("")}</tr>`}).join("");
+  let d=$("cmp");if(!d){d=document.createElement("div");d.id="cmp";document.body.appendChild(d)}
+  d.innerHTML=`<div class="top"><h2>Comparação de ${L.length} contratos</h2><button class="noprint" id="cmpP">🖨 Imprimir</button><button class="noprint" id="cmpX">Fechar</button></div><div class="leg">Linhas a amarelo = valores diferentes entre os contratos (CPE, valores, datas, etc.).</div><table><tr><th class="l"></th>${L.map(i=>`<th>${esc(i.fornecedor)}<div class="sub">${esc(i.espaco||i.local||"")}</div></th>`).join("")}</tr>${rows}</table>`;
+  document.body.classList.add("cmpopen");
+  $("cmpX").onclick=()=>{d.remove();document.body.classList.remove("cmpopen")};
+  $("cmpP").onclick=()=>window.print();
 };
 $("bMore").onclick=()=>{const m=$("more"),o=m.style.display==="none";m.style.display=o?"":"none";$("bMore").textContent=o?"Menos filtros ▴":"Mais filtros ▾"};
 ["q","fEst","fPag","fCli","fUti","fEsp","fFor","fPer","fFid","fSub"].forEach(id=>$(id).oninput=render);
