@@ -321,7 +321,8 @@ function proxima(i){
 const COLS=[["fornecedor","Contrato"],["cliente","Cliente / Corresponde a"],["valor","Valor"],["renov","Renovação"]];
 const PER={1:"mês",2:"bimestre",3:"trimestre",6:"semestre",12:"ano",24:"2 anos"};
 const kv=(k,v)=>v!==""&&v!=null?`<div><div class="k">${k}</div><div>${v}</div></div>`:"";
-let openRows=new Set(),sel=new Set();
+let openRows=new Set(),sel=new Set(),hist={};
+function histHtml(i){const L=hist[i.id]||[];if(!L.length)return"";const u=x=>x.consumo!=null?" · "+Number(x.consumo).toLocaleString("pt-PT")+" "+(x.unidade_consumo||""):"";const ok=L.filter(x=>x.incluir_na_media);const dd=x=>x.periodo_inicio&&x.periodo_fim?(Date.parse(x.periodo_fim)-Date.parse(x.periodo_inicio))/864e5+1:null;let m=null;if(ok.length){m=ok.every(x=>dd(x)!==null)?ok.reduce((a,x)=>a+Number(x.valor),0)/ok.reduce((a,x)=>a+dd(x),0)*30.4375:ok.reduce((a,x)=>a+Number(x.valor),0)/ok.length}return `<div style="margin-top:6px"><b>${L.length} fatura${L.length>1?"s":""}</b>${m!=null?` · média mensal <b>${eur(m)}</b> (${ok.length} na média)`:""}</div>`+L.map(x=>`<div class="sub" style="${x.incluir_na_media?"":"text-decoration:line-through"}">${x.periodo_inicio?fd(x.periodo_inicio)+" a "+fd(x.periodo_fim):esc(x.documento||"")} · <b>${eur(x.valor)}</b>${u(x)}</div>`).join("")}
 $("thead").innerHTML=COLS.map(([k,l])=>`<th data-k="${k}">${l}</th>`).join("");
 $("thead").onclick=e=>{const k=e.target.dataset?.k;if(!k)return;sortD=sortK===k?-sortD:1;sortK=k;render()};
 
@@ -416,7 +417,7 @@ function render(){
       <td class="n"><b>${eur(i.valor)}</b><div class="sub">/${PER[i.period]||""}${i.iva==="nao"?" + IVA":""}${Number(i.period)>1?" · ≈ "+eur(mensal(i))+"/mês":""}</div></td>
       <td><b>${fd(p)}</b><div>${dTxt?`<span class="badge ${cls}">${dTxt}</span>`:""}</div>${i.fidel?`<div class="sub">fidelização até ${fd(i.fidel)}</div>`:""}</td></tr>
     <tr class="dt${sl?" sl":""}" data-for="${esc(i.id)}" style="display:${open?"":"none"}"><td colspan="4">
-      <div class="cg">${kv("Localização",esc(i.local))}${kv("Nº contrato / cliente",esc(i.contrato))}${kv("CPE / ponto / contador",esc(i.cpe))}${kv("Pagamento",esc(i.pag))}${kv("Origem do dinheiro",esc(i.origem))}${kv("Aviso prévio",i.aviso!==""?i.aviso+" dias":"")}${kv("Detalhes",det(i))}${kv("Notas",esc(i.notas))}</div>
+      <div class="cg">${kv("Localização",esc(i.local))}${kv("Nº contrato / cliente",esc(i.contrato))}${kv("CPE / ponto / contador",esc(i.cpe))}${kv("Pagamento",esc(i.pag))}${kv("Origem do dinheiro",esc(i.origem))}${kv("Aviso prévio",i.aviso!==""?i.aviso+" dias":"")}${kv("Detalhes",det(i))}${kv("Histórico de faturas",histHtml(i))}${kv("Notas",esc(i.notas))}</div>
       ${i.acao_pendente?`<div class="pend">⚠ A tratar: ${esc(i.acao_pendente)}</div>`:""}
       <button class="sm ed" type="button" data-ed="${esc(i.id)}">Editar</button>
     </td></tr>`}).join("");
@@ -452,7 +453,13 @@ $("bXls").onclick=()=>{
   const sumSheet=(lbl,k)=>{const r=grp(k);const w=XLSX.utils.aoa_to_sheet([[lbl,"Nº contratos","Total mensal (€)","Média mensal por contrato (€)","Total anual (€)"],...r,["TOTAL",act.length,Math.round(act.reduce((s,i)=>s+mensal(i),0)*100)/100,null,Math.round(act.reduce((s,i)=>s+mensal(i),0)*1200)/100]]);w["!cols"]=[{wch:34},{wch:12},{wch:16},{wch:28},{wch:16}];return w};
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,"Contratos");
+  const ids=new Set(rows.map(i=>i.id)),byId=Object.fromEntries(items.map(i=>[i.id,i]));
+  const fr=[["Categoria","Fornecedor","Contrato","Corresponde a","Período início","Período fim","Valor (€)","Consumo","Unidade","Na média?","Documento","Notas"]];
+  Object.keys(hist).filter(k=>ids.has(k)).forEach(k=>hist[k].forEach(h=>{const i=byId[k];fr.push([i.categoria,i.fornecedor,i.contrato,i.espaco||null,dtc(h.periodo_inicio),dtc(h.periodo_fim),Number(h.valor),h.consumo!=null?Number(h.consumo):null,h.unidade_consumo||null,h.incluir_na_media?"Sim":"Não",h.documento||null,h.notas||null])}));
+  fr.sort((a,b)=>a===fr[0]?-1:b===fr[0]?1:String(a[0]+a[1]+a[2]).localeCompare(String(b[0]+b[1]+b[2]),"pt")||((b[5]||0)-(a[5]||0)));
+  const wf=XLSX.utils.aoa_to_sheet(fr,{cellDates:true});wf["!cols"]=[16,22,30,18,13,13,11,10,8,9,34,40].map(w=>({wch:w}));wf["!autofilter"]={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:fr.length-1,c:11}})};
   XLSX.utils.book_append_sheet(wb,sumSheet("Categoria","categoria"),"Por categoria");
+  XLSX.utils.book_append_sheet(wb,wf,"Faturas (histórico)");
   XLSX.utils.book_append_sheet(wb,sumSheet("Tipo de serviço","subcategoria"),"Por tipo de serviço");
   XLSX.utils.book_append_sheet(wb,sumSheet("Fornecedor","fornecedor"),"Por fornecedor");
   XLSX.utils.book_append_sheet(wb,sumSheet("Corresponde a","espaco"),"Por espaço");
@@ -519,7 +526,10 @@ const toRow=o=>({categoria:o.categoria,fornecedor:o.fornecedor,servico:o.servico
 async function load(){
   const {data,error}=await sb.from("subscricoes").select("*").order("data_renovacao");
   if(error){toast("Erro a carregar: "+error.message);return}
-  items=data.map(fromRow);render();
+  items=data.map(fromRow);
+  const hr=await sb.from("faturas_historico").select("*").order("periodo_fim",{ascending:false,nullsFirst:false});
+  hist={};(hr.data||[]).forEach(h=>{(hist[h.subscricao_id]=hist[h.subscricao_id]||[]).push(h)});
+  render();
 }
 async function save(id,o){
   const row=toRow(o);
