@@ -83,6 +83,16 @@ button.gh:hover{background:var(--card);border-color:var(--line);color:var(--ink)
 .catsum b{color:var(--ink)}
 .bar{margin-bottom:10px;align-items:center}
 .bar select{max-width:100%}
+.ms{position:relative}
+.ms summary{list-style:none;cursor:pointer;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);white-space:nowrap;max-width:230px;overflow:hidden;text-overflow:ellipsis}
+.ms summary::-webkit-details-marker{display:none}
+.ms summary::after{content:" ▾";color:var(--mut)}
+.ms.on summary{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 8%,var(--card));font-weight:600}
+.msl{position:absolute;z-index:30;top:100%;left:0;margin-top:4px;min-width:230px;max-width:340px;max-height:320px;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:6px}
+.msl label{display:flex;gap:8px;align-items:center;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:14px}
+.msl label:hover{background:color-mix(in srgb,var(--acc) 8%,transparent)}
+.msl .mst{display:flex;gap:6px;padding:2px 4px 6px;border-bottom:1px solid var(--line);margin-bottom:4px}
+
 #more{padding:10px;background:var(--card);border:1px dashed var(--line);border-radius:10px}
 tr.r{cursor:pointer}
 tr.r:hover td{background:color-mix(in srgb,var(--acc) 5%,transparent)}
@@ -178,23 +188,23 @@ input.sel{width:16px;height:16px;vertical-align:-3px;margin-right:4px;cursor:poi
   <div class="catsum" id="catsum"></div>
   <div class="bar">
     <input id="q" type="search" placeholder="Pesquisar (cliente, fornecedor, local, conta…)">
-    <select id="fCli"><option value="">Empresa / cliente: todos</option></select>
-    <select id="fEsp"><option value="">Corresponde a: todos</option></select>
-    <select id="fFor"><option value="">Fornecedor: todos</option></select>
+    <div class="ms" id="fCli"></div>
+    <div class="ms" id="fEsp"></div>
+    <div class="ms" id="fFor"></div>
     <button id="bSelAll" class="sm" type="button" title="Seleciona todos os contratos que estão visíveis com os filtros atuais">☑ Selecionar visíveis</button>
     <button id="bMore" class="sm" type="button">Mais filtros ▾</button>
     <button id="bClr" class="sm gh" type="button">Limpar</button>
   </div>
   <div class="bar" id="more" style="display:none">
-    <select id="fUti"><option value="">Quem usa: todos</option></select>
-    <select id="fCat"><option value="">Categoria: todas</option></select>
-    <select id="fSub"><option value="">Tipo de serviço: todos</option></select>
-    <select id="fPer"><option value="">Tipo: mensal e anual</option><option value="1">Mensal</option><option value="2">Bimestral</option><option value="3">Trimestral</option><option value="6">Semestral</option><option value="12">Anual</option><option value="24">Bianual (2 anos)</option></select>
-    <select id="fFid"><option value="">Fidelização: todas</option><option value="sem">Sem fidelização</option><option value="com">Com fidelização</option></select>
-    <select id="fEst"><option value="">Estado: todos</option><option value="pend">Com ações a tratar</option><option value="ativo">Ativos</option><option value="cancelar">A cancelar</option><option value="cancelado">Cancelados</option></select>
-    <select id="fPag"><option value="">Pagamento: todos</option></select>
+    <div class="ms" id="fUti"></div>
+    <div class="ms" id="fCat"></div>
+    <div class="ms" id="fSub"></div>
+    <div class="ms" id="fPer"></div>
+    <div class="ms" id="fFid"></div>
+    <div class="ms" id="fEst"></div>
+    <div class="ms" id="fPag"></div>
   </div>
-  <div id="selbar" class="selbar" style="display:none"><b id="selN"></b> <button id="bCmp" class="sm" type="button">⇄ Comparar</button> <button id="bPrintSel" class="sm" type="button">🖨 Imprimir selecionados</button> <button id="bClrSel" class="sm gh" type="button">Limpar seleção</button></div>
+  <div id="selbar" class="selbar" style="display:none"><b id="selN"></b> <button id="bCmp" class="sm" type="button">⇄ Comparar</button> <button id="bEdSel" class="sm" type="button">✎ Editar selecionados</button> <button id="bPrintSel" class="sm" type="button">🖨 Imprimir selecionados</button> <button id="bClrSel" class="sm gh" type="button">Limpar seleção</button></div>
   <div id="forn" style="display:none"></div>
   <div class="tw" id="twC"><table>
     <thead><tr id="thead"></tr></thead>
@@ -272,6 +282,15 @@ input.sel{width:16px;height:16px;vertical-align:-3px;margin-right:4px;cursor:poi
   <div class="hint" style="margin-top:10px">Só emails autorizados pela administração conseguem ver dados.</div>
 </div></div>
 
+<dialog id="dBulk"><form id="fBulk" method="dialog" style="padding:18px;display:grid;gap:10px">
+<h3 style="margin-top:0">Editar <span id="bulkN"></span> contratos</h3>
+<p class="sub">Só são alterados os campos que preencheres. Os outros ficam como estão.</p>
+<label>Empresa / cliente<input id="bkCli" list="dlBkCli" autocomplete="off"></label>
+<label>Corresponde a (espaço)<input id="bkEsp" list="dlBkEsp" autocomplete="off"></label>
+<label>Quem usa<input id="bkUti" list="dlUti" autocomplete="off"></label>
+<datalist id="dlBkCli"></datalist><datalist id="dlBkEsp"></datalist>
+<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" id="bkCancel" class="gh">Cancelar</button><button type="submit" id="bkOk">Aplicar</button></div>
+</form></dialog>
 <dialog id="dMem"><form id="fMem" method="dialog">
   <h2>Utilizadores autorizados</h2>
   <div id="memList" style="margin-bottom:12px"></div>
@@ -293,7 +312,7 @@ const $=id=>document.getElementById(id);
 const eur=n=>new Intl.NumberFormat("pt-PT",{style:"currency",currency:"EUR"}).format(n||0);
 const fd=s=>s?new Date(s+"T00:00:00").toLocaleDateString("pt-PT"):"—";
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-let items=[],col=null,editing=null,sortK="renov",sortD=1,catF="",persist=false;
+let items=[],col=null,editing=null,sortK="renov",sortD=1,persist=false;
 
 CATS.forEach(c=>$("categoria").insertAdjacentHTML("beforeend",`<option>${c}</option>`));
 SUBS.forEach(c=>$("subcategoria").insertAdjacentHTML("beforeend",`<option>${c}</option>`));
@@ -326,17 +345,43 @@ function histHtml(i){const L=hist[i.id]||[];if(!L.length)return"";const u=x=>x.c
 $("thead").innerHTML=COLS.map(([k,l])=>`<th data-k="${k}">${l}</th>`).join("");
 $("thead").onclick=e=>{const k=e.target.dataset?.k;if(!k)return;sortD=sortK===k?-sortD:1;sortK=k;render()};
 
+const MSL={fCli:"Empresa / cliente",fEsp:"Corresponde a",fFor:"Fornecedor",fUti:"Quem usa",fCat:"Categoria",fSub:"Tipo de serviço",fPer:"Tipo",fFid:"Fidelização",fEst:"Estado",fPag:"Pagamento"};
+const FIL={};Object.keys(MSL).forEach(k=>FIL[k]=new Set());
+const MSF={fPer:[["1","Mensal"],["2","Bimestral"],["3","Trimestral"],["6","Semestral"],["12","Anual"],["24","Bianual (2 anos)"]],fFid:[["com","Com fidelização"],["sem","Sem fidelização"]],fEst:[["pend","Com ações a tratar"],["ativo","Ativos"],["cancelar","A cancelar"],["cancelado","Cancelados"]]};
+const VAZIO="(vazio)";
 function filtered(){
-  const q=$("q").value.toLowerCase(),e=$("fEst").value,p=$("fPag").value,cl=$("fCli").value,ut=$("fUti").value,es=$("fEsp").value,fo=$("fFor").value,pe=$("fPer").value,fi=$("fFid").value,sb2=$("fSub").value;
+  const q=$("q").value.toLowerCase();
   const hoje=new Date().toISOString().slice(0,10);
-  return items.filter(i=>(!catF||i.categoria===catF)&&(!e||(e==="pend"?!!i.acao_pendente:i.estado===e))&&(!p||i.pag===p)&&(!cl||i.cliente===cl)&&(!ut||(i.utilizador||"")===ut)&&(!es||(i.espaco||"")===es)&&(!sb2||i.subcategoria===sb2)&&(!fo||i.fornecedor===fo)&&(!pe||String(i.period)===pe)&&
-    (!fi||(fi==="com"?(i.fidel&&i.fidel>=hoje):!(i.fidel&&i.fidel>=hoje)))&&
+  const has=(k,v)=>!FIL[k].size||FIL[k].has(v||VAZIO);
+  return items.filter(i=>has("fCat",i.categoria)&&has("fCli",i.cliente)&&has("fUti",i.utilizador)&&has("fEsp",i.espaco)&&has("fSub",i.subcategoria)&&has("fFor",i.fornecedor)&&has("fPag",i.pag)&&has("fPer",String(i.period))&&
+    (!FIL.fEst.size||[...FIL.fEst].some(e=>e==="pend"?!!i.acao_pendente:i.estado===e))&&
+    (!FIL.fFid.size||[...FIL.fFid].some(f=>f==="com"?(i.fidel&&i.fidel>=hoje):!(i.fidel&&i.fidel>=hoje)))&&
     (!q||[i.fornecedor,i.servico,i.cliente,i.cpe,i.espaco,i.local,i.origem,i.contrato,i.notas,i.categoria,i.subcategoria].join(" ").toLowerCase().includes(q)));
 }
+function msSync(id,opts){
+  const el=$(id),key=opts.map(o=>o[0]).join("\u0001");
+  if(el.dataset.key!==key||!el.firstChild){
+    const was=el.firstChild&&el.firstChild.open;
+    el.dataset.key=key;
+    el.innerHTML=`<details${was?" open":""}><summary></summary><div class="msl"><div class="mst"><button type="button" class="sm gh" data-a="clr">Limpar</button><button type="button" class="sm gh" data-a="all">Todos</button></div>${opts.map(([v,l])=>`<label><input type="checkbox" value="${esc(v)}"> ${esc(l)}</label>`).join("")}</div></details>`;
+  }
+  FIL[id]=new Set([...FIL[id]].filter(v=>opts.some(o=>o[0]===v)));
+  el.querySelectorAll("input").forEach(c=>c.checked=FIL[id].has(c.value));
+  const n=FIL[id].size,lab=MSL[id],lbl=Object.fromEntries(opts);
+  el.firstChild.querySelector("summary").textContent=!n?lab+": todos":n===1?lab+": "+lbl[[...FIL[id]][0]]:lab+": "+n+" selecionados";
+  el.classList.toggle("on",!!n);
+}
+function msInit(){
+  document.querySelectorAll(".ms").forEach(el=>{
+    el.addEventListener("change",e=>{if(e.target.type!=="checkbox")return;const s=FIL[el.id];e.target.checked?s.add(e.target.value):s.delete(e.target.value);render()});
+    el.addEventListener("click",e=>{const a=e.target.dataset&&e.target.dataset.a;if(!a)return;e.preventDefault();FIL[el.id]=a==="clr"?new Set():new Set([...el.querySelectorAll("input")].map(c=>c.value));render()});
+  });
+  document.addEventListener("click",e=>document.querySelectorAll(".ms details[open]").forEach(d=>{if(!d.parentNode.contains(e.target))d.open=false}));
+}
 function fillSel(id,vals){
-  const el=$(id),cur=el.value,first=el.options[0].outerHTML;
-  el.innerHTML=first+[...new Set(vals.filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt")).map(v=>`<option>${esc(v)}</option>`).join("");
-  el.value=[...el.options].some(o=>o.value===cur)?cur:"";
+  const u=[...new Set(vals.filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt"));
+  if(vals.some(v=>!v)&&(id==="fUti"||id==="fEsp"||id==="fSub"))u.push(VAZIO);
+  msSync(id,u.map(v=>[v,v]));
 }
 let vista="C";
 function fimAlerta(d){return d<=45?45:d<=60?60:90}
@@ -383,7 +428,7 @@ $("vC").onclick=()=>setVista("C");$("vF").onclick=()=>setVista("F");
 function render(){
   alertas();renderForn();
   fillSel("fCli",items.map(i=>i.cliente));fillSel("fUti",items.map(i=>i.utilizador));fillSel("fEsp",items.map(i=>i.espaco));$("dlUti").innerHTML=[...new Set(items.map(i=>i.utilizador).filter(Boolean))].map(v=>`<option value="${esc(v)}">`).join("");fillSel("fFor",items.map(i=>i.fornecedor));fillSel("fCat",items.map(i=>i.categoria));fillSel("fSub",items.map(i=>i.subcategoria));fillSel("fPag",items.map(i=>i.pag));
-  $("fCat").value=catF;
+  ["fPer","fFid","fEst"].forEach(k=>msSync(k,MSF[k]));
   const all=items.filter(i=>i.estado!=="cancelado");
   const act=filtered().filter(i=>i.estado!=="cancelado");
   const m=act.reduce((s,i)=>s+mensal(i),0);
@@ -397,9 +442,9 @@ function render(){
     <div class="kpi" id="kPend" style="cursor:pointer"><div class="l">Com ações a tratar</div><div class="v">${pend}</div><div class="sub">${aviso.length?aviso.length+" na janela de cancelamento":"clique para filtrar"}</div></div>`;
   $("kPend").onclick=()=>{$("fEst").value=$("fEst").value==="pend"?"":"pend";render()};
   const cats={},cnt={};all.forEach(i=>{cats[i.categoria]=(cats[i.categoria]||0)+mensal(i);cnt[i.categoria]=(cnt[i.categoria]||0)+1});
-  $("chips").innerHTML=`<span class="chip ${catF?"":"on"}" data-c="">Todas<span class="c">${all.length}</span></span>`+Object.keys(cats).sort().map(c=>`<span class="chip ${catF===c?"on":""}" data-c="${esc(c)}">${esc(c)}<span class="c">${cnt[c]}</span></span>`).join("");
-  $("catsum").innerHTML=catF&&cnt[catF]?`<b>${esc(catF)}</b>: média de <b>${eur(cats[catF]/cnt[catF])}/mês</b> por contrato · total <b>${eur(cats[catF])}/mês</b> (${eur(cats[catF]*12)}/ano)`:"";
-  $("chips").onclick=e=>{if(e.target.dataset.c!==undefined){catF=e.target.dataset.c;render()}};
+  $("chips").innerHTML=`<span class="chip ${FIL.fCat.size?"":"on"}" data-c="">Todas<span class="c">${all.length}</span></span>`+Object.keys(cats).sort().map(c=>`<span class="chip ${FIL.fCat.has(c)?"on":""}" data-c="${esc(c)}">${esc(c)}<span class="c">${cnt[c]}</span></span>`).join("");
+  {const c1=FIL.fCat.size===1?[...FIL.fCat][0]:"";$("catsum").innerHTML=c1&&cnt[c1]?`<b>${esc(c1)}</b>: média de <b>${eur(cats[c1]/cnt[c1])}/mês</b> por contrato · total <b>${eur(cats[c1])}/mês</b> (${eur(cats[c1]*12)}/ano)`:""}
+  $("chips").onclick=e=>{{const c=e.target.dataset.c;if(c===undefined)return;if(c==="")FIL.fCat=new Set();else if(e.ctrlKey||e.metaKey||e.shiftKey){FIL.fCat.has(c)?FIL.fCat.delete(c):FIL.fCat.add(c)}else FIL.fCat=FIL.fCat.size===1&&FIL.fCat.has(c)?new Set():new Set([c]);render()}};
   const rows=filtered().sort((a,b)=>{
     const f=k=>k==="renov"?proxima(a)&&proxima(b)?proxima(a)<proxima(b)?-1:1:0:(String(a[k]??"").localeCompare(String(b[k]??""),"pt",{numeric:true}));
     const x=sortK==="valor"?mensal(a)-mensal(b):f(sortK);return x*sortD});
@@ -469,6 +514,27 @@ $("bXls").onclick=()=>{
 };
 function selUpd(){const n=sel.size;$("selbar").style.display=n?"flex":"none";$("selN").textContent=n+" selecionado"+(n>1?"s":"")}
 $("bSelAll").onclick=()=>{filtered().forEach(i=>sel.add(i.id));render();selUpd()};
+$("bEdSel").onclick=()=>{
+  if(!sel.size)return;
+  $("bulkN").textContent=sel.size;
+  $("dlBkCli").innerHTML=[...new Set(items.map(i=>i.cliente).filter(Boolean))].map(v=>`<option value="${esc(v)}">`).join("");
+  $("dlBkEsp").innerHTML=[...new Set(items.map(i=>i.espaco).filter(Boolean))].map(v=>`<option value="${esc(v)}">`).join("");
+  ["bkCli","bkEsp","bkUti"].forEach(k=>$(k).value="");
+  $("dBulk").showModal();
+};
+$("bkCancel").onclick=()=>$("dBulk").close();
+$("fBulk").onsubmit=async e=>{
+  e.preventDefault();
+  const p={};
+  if($("bkCli").value.trim())p.cliente=$("bkCli").value.trim();
+  if($("bkEsp").value.trim())p.espaco=$("bkEsp").value.trim();
+  if($("bkUti").value.trim())p.utilizador=$("bkUti").value.trim();
+  if(!Object.keys(p).length){toast("Preenche pelo menos um campo");return}
+  const ids=[...sel];
+  const {error}=await sb.from("subscricoes").update(p).in("id",ids);
+  if(error){toast("Erro ao guardar: "+error.message);return}
+  $("dBulk").close();toast(ids.length+" contratos atualizados");await load();selUpd();
+};
 $("bClrSel").onclick=()=>{sel.clear();render();selUpd()};
 $("bPrintSel").onclick=()=>{if(vista!=="C")setVista("C");document.body.classList.add("selprint");setTimeout(()=>{window.print();},50)};
 window.addEventListener("afterprint",()=>document.body.classList.remove("selprint"));
@@ -485,9 +551,8 @@ $("bCmp").onclick=()=>{
   $("cmpP").onclick=()=>window.print();
 };
 $("bMore").onclick=()=>{const m=$("more"),o=m.style.display==="none";m.style.display=o?"":"none";$("bMore").textContent=o?"Menos filtros ▴":"Mais filtros ▾"};
-["q","fEst","fPag","fCli","fUti","fEsp","fFor","fPer","fFid","fSub"].forEach(id=>$(id).oninput=render);
-$("fCat").oninput=()=>{catF=$("fCat").value;render()};
-$("bClr").onclick=()=>{["q","fEst","fPag","fCli","fUti","fEsp","fFor","fPer","fFid","fSub"].forEach(id=>$(id).value="");catF="";render()};
+$("q").oninput=render;msInit();
+$("bClr").onclick=()=>{$("q").value="";Object.keys(FIL).forEach(k=>FIL[k]=new Set());render()};
 
 const DET=["subcategoria","potencia","tarifa","consumo","preco_un","velocidade","canais","capital","franquia"];
 const F=["cpe","espaco","utilizador","acao_pendente","categoria","fornecedor","servico","cliente","local","contrato","valor","period","iva","pag","origem","renov","aviso","fidel","estado","notas",...DET];
