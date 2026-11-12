@@ -183,6 +183,7 @@ input.sel{width:16px;height:16px;vertical-align:-3px;margin-right:4px;cursor:poi
   
   <div id="alertas"></div>
   <div class="kpis" id="kpis"></div>
+  <div class="chips" id="tabs"></div>
   <div class="chips"><span class="chip on" id="vC">Contratos</span><span class="chip" id="vF">Por fornecedor (com CPEs)</span></div>
   <div class="chips" id="chips"></div>
   <div class="catsum" id="catsum"></div>
@@ -204,7 +205,7 @@ input.sel{width:16px;height:16px;vertical-align:-3px;margin-right:4px;cursor:poi
     <div class="ms" id="fEst"></div>
     <div class="ms" id="fPag"></div>
   </div>
-  <div id="selbar" class="selbar" style="display:none"><b id="selN"></b> <button id="bCmp" class="sm" type="button">⇄ Comparar</button> <button id="bEdSel" class="sm" type="button">✎ Editar selecionados</button> <button id="bPrintSel" class="sm" type="button">🖨 Imprimir selecionados</button> <button id="bClrSel" class="sm gh" type="button">Limpar seleção</button></div>
+  <div id="selbar" class="selbar" style="display:none"><b id="selN"></b> <button id="bCmp" class="sm" type="button">⇄ Comparar</button> <button id="bCfSel" class="sm" type="button">✔ Marcar como confirmados</button> <button id="bUnSel" class="sm gh" type="button">↩ Voltar a «a tratar»</button> <button id="bEdSel" class="sm" type="button">✎ Editar selecionados</button> <button id="bPrintSel" class="sm" type="button">🖨 Imprimir selecionados</button> <button id="bClrSel" class="sm gh" type="button">Limpar seleção</button></div>
   <div id="forn" style="display:none"></div>
   <div class="tw" id="twC"><table>
     <thead><tr id="thead"></tr></thead>
@@ -245,6 +246,7 @@ input.sel{width:16px;height:16px;vertical-align:-3px;margin-right:4px;cursor:poi
     <div id="w_canais" data-cats="Telecomunicações"><label>Canais / linhas / telemóveis</label><input id="canais" placeholder="Ex.: 160 canais, 2 telemóveis"></div>
     <div id="w_capital" data-cats="Seguros"><label>Capital seguro (€)</label><input id="capital" type="number" step="0.01" min="0"></div>
     <div id="w_franquia" data-cats="Seguros"><label>Franquia (€)</label><input id="franquia" type="number" step="0.01" min="0"></div>
+    <div class="f"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="conf"> ✔ Confirmado: já verifiquei que os dados deste contrato estão certos</label></div>
     <div class="f"><label>⚠ A tratar (alterações a pedir ao fornecedor)</label><textarea id="acao_pendente" rows="2" placeholder="Ex.: alterar titular de S.A. para Lda, atualizar morada"></textarea></div>
     <div class="f"><label>Notas</label><textarea id="notas" rows="2" placeholder="Contactos, condições, cláusulas, etc."></textarea></div>
   </div>
@@ -340,7 +342,7 @@ function proxima(i){
 const COLS=[["fornecedor","Contrato"],["cliente","Cliente / Corresponde a"],["valor","Valor"],["renov","Renovação"]];
 const PER={1:"mês",2:"bimestre",3:"trimestre",6:"semestre",12:"ano",24:"2 anos"};
 const kv=(k,v)=>v!==""&&v!=null?`<div><div class="k">${k}</div><div>${v}</div></div>`:"";
-let openRows=new Set(),sel=new Set(),hist={};
+let openRows=new Set(),sel=new Set(),hist={},tab="pend";
 function histHtml(i){const L=hist[i.id]||[];if(!L.length)return"";const u=x=>x.consumo!=null?" · "+Number(x.consumo).toLocaleString("pt-PT")+" "+(x.unidade_consumo||""):"";const ok=L.filter(x=>x.incluir_na_media);const dd=x=>x.periodo_inicio&&x.periodo_fim?(Date.parse(x.periodo_fim)-Date.parse(x.periodo_inicio))/864e5+1:null;let m=null;if(ok.length){m=ok.every(x=>dd(x)!==null)?ok.reduce((a,x)=>a+Number(x.valor),0)/ok.reduce((a,x)=>a+dd(x),0)*30.4375:ok.reduce((a,x)=>a+Number(x.valor),0)/ok.length}return `<div style="margin-top:6px"><b>${L.length} fatura${L.length>1?"s":""}</b>${m!=null?` · média mensal <b>${eur(m)}</b> (${ok.length} na média)`:""}</div>`+L.map(x=>`<div class="sub" style="${x.incluir_na_media?"":"text-decoration:line-through"}">${x.periodo_inicio?fd(x.periodo_inicio)+" a "+fd(x.periodo_fim):esc(x.documento||"")} · <b>${eur(x.valor)}</b>${u(x)}</div>`).join("")}
 $("thead").innerHTML=COLS.map(([k,l])=>`<th data-k="${k}">${l}</th>`).join("");
 $("thead").onclick=e=>{const k=e.target.dataset?.k;if(!k)return;sortD=sortK===k?-sortD:1;sortK=k;render()};
@@ -353,7 +355,7 @@ function filtered(){
   const q=$("q").value.toLowerCase();
   const hoje=new Date().toISOString().slice(0,10);
   const has=(k,v)=>!FIL[k].size||FIL[k].has(v||VAZIO);
-  return items.filter(i=>has("fCat",i.categoria)&&has("fCli",i.cliente)&&has("fUti",i.utilizador)&&has("fEsp",i.espaco)&&has("fSub",i.subcategoria)&&has("fFor",i.fornecedor)&&has("fPag",i.pag)&&has("fPer",String(i.period))&&
+  return items.filter(i=>(tab==="all"||(tab==="pend"?!i.conf:!!i.conf))&&has("fCat",i.categoria)&&has("fCli",i.cliente)&&has("fUti",i.utilizador)&&has("fEsp",i.espaco)&&has("fSub",i.subcategoria)&&has("fFor",i.fornecedor)&&has("fPag",i.pag)&&has("fPer",String(i.period))&&
     (!FIL.fEst.size||[...FIL.fEst].some(e=>e==="pend"?!!i.acao_pendente:i.estado===e))&&
     (!FIL.fFid.size||[...FIL.fFid].some(f=>f==="com"?(i.fidel&&i.fidel>=hoje):!(i.fidel&&i.fidel>=hoje)))&&
     (!q||[i.fornecedor,i.servico,i.cliente,i.cpe,i.espaco,i.local,i.origem,i.contrato,i.notas,i.categoria,i.subcategoria].join(" ").toLowerCase().includes(q)));
@@ -426,7 +428,7 @@ $("forn").onclick=async e=>{
 function setVista(v){vista=v;$("vC").classList.toggle("on",v==="C");$("vF").classList.toggle("on",v==="F");$("twC").style.display=v==="C"?"":"none";$("forn").style.display=v==="F"?"":"none";$("chips").style.display=v==="C"?"":"none"}
 $("vC").onclick=()=>setVista("C");$("vF").onclick=()=>setVista("F");
 function render(){
-  alertas();renderForn();
+  alertas();renderForn();renderTabs();
   fillSel("fCli",items.map(i=>i.cliente));fillSel("fUti",items.map(i=>i.utilizador));fillSel("fEsp",items.map(i=>i.espaco));$("dlUti").innerHTML=[...new Set(items.map(i=>i.utilizador).filter(Boolean))].map(v=>`<option value="${esc(v)}">`).join("");fillSel("fFor",items.map(i=>i.fornecedor));fillSel("fCat",items.map(i=>i.categoria));fillSel("fSub",items.map(i=>i.subcategoria));fillSel("fPag",items.map(i=>i.pag));
   ["fPer","fFid","fEst"].forEach(k=>msSync(k,MSF[k]));
   const all=items.filter(i=>i.estado!=="cancelado");
@@ -458,13 +460,13 @@ function render(){
     const sl=sel.has(i.id);
     return `<tr class="r${cx?" cx":""}${sl?" sl":""}" data-id="${esc(i.id)}">
       <td><input type="checkbox" class="sel" data-s="${esc(i.id)}" ${sl?"checked":""} title="Selecionar para comparar / imprimir"> <b>${esc(i.fornecedor)}</b>${est}<div class="sub"><span class="tag">${esc(i.categoria)}${i.subcategoria?" · "+esc(i.subcategoria):""}</span> ${esc(i.servico)}</div></td>
-      <td><b>${esc(i.cliente)}</b>${i.acao_pendente?' <span class="badge w" title="'+esc(i.acao_pendente)+'">⚠ a tratar</span>':""}<div class="sub">${i.espaco?`<span class="tag" style="font-weight:600">${esc(i.espaco)}</span> `:""}${i.utilizador?"usa: "+esc(i.utilizador):""}</div></td>
+      <td><b>${esc(i.cliente)}</b>${i.conf?' <span class="badge n">✔ confirmado</span>':""}${i.acao_pendente?' <span class="badge w" title="'+esc(i.acao_pendente)+'">⚠ a tratar</span>':""}<div class="sub">${i.espaco?`<span class="tag" style="font-weight:600">${esc(i.espaco)}</span> `:""}${i.utilizador?"usa: "+esc(i.utilizador):""}</div></td>
       <td class="n"><b>${eur(i.valor)}</b><div class="sub">/${PER[i.period]||""}${i.iva==="nao"?" + IVA":""}${Number(i.period)>1?" · ≈ "+eur(mensal(i))+"/mês":""}</div></td>
       <td><b>${fd(p)}</b><div>${dTxt?`<span class="badge ${cls}">${dTxt}</span>`:""}</div>${i.fidel?`<div class="sub">fidelização até ${fd(i.fidel)}</div>`:""}</td></tr>
     <tr class="dt${sl?" sl":""}" data-for="${esc(i.id)}" style="display:${open?"":"none"}"><td colspan="4">
       <div class="cg">${kv("Localização",esc(i.local))}${kv("Nº contrato / cliente",esc(i.contrato))}${kv("CPE / ponto / contador",esc(i.cpe))}${kv("Pagamento",esc(i.pag))}${kv("Origem do dinheiro",esc(i.origem))}${kv("Aviso prévio",i.aviso!==""?i.aviso+" dias":"")}${kv("Detalhes",det(i))}${kv("Histórico de faturas",histHtml(i))}${kv("Notas",esc(i.notas))}</div>
       ${i.acao_pendente?`<div class="pend">⚠ A tratar: ${esc(i.acao_pendente)}</div>`:""}
-      <button class="sm ed" type="button" data-ed="${esc(i.id)}">Editar</button>
+      <button class="sm ed" type="button" data-ed="${esc(i.id)}">Editar</button> <button class="sm" type="button" data-cf="${esc(i.id)}" data-v="${i.conf?0:1}">${i.conf?"↩ Voltar a «a tratar»":"✔ Marcar como confirmado"}</button>
     </td></tr>`}).join("");
   const used=[...new Set(items.map(i=>i.pag))];
 }
@@ -472,6 +474,8 @@ $("tb").onclick=e=>{
   const cb=e.target.closest("input.sel");
   if(cb){const id=cb.dataset.s;cb.checked?sel.add(id):sel.delete(id);
     document.querySelectorAll('#tb tr[data-id="'+id+'"],#tb tr[data-for="'+id+'"]').forEach(r=>r.classList.toggle("sl",cb.checked));selUpd();return}
+  const cf=e.target.closest("button[data-cf]");
+  if(cf){setConf([cf.dataset.cf],cf.dataset.v==="1");return}
   const b=e.target.closest("button[data-ed]");
   if(b){openDlg(items.find(i=>i.id===b.dataset.ed));return}
   const tr=e.target.closest("tr.r");if(!tr)return;
@@ -514,6 +518,19 @@ $("bXls").onclick=()=>{
 };
 function selUpd(){const n=sel.size;$("selbar").style.display=n?"flex":"none";$("selN").textContent=n+" selecionado"+(n>1?"s":"")}
 $("bSelAll").onclick=()=>{filtered().forEach(i=>sel.add(i.id));render();selUpd()};
+async function setConf(ids,v){
+  const {error}=await sb.from("subscricoes").update({confirmado:v,confirmado_em:v?new Date().toISOString():null}).in("id",ids);
+  if(error){toast("Erro ao guardar: "+error.message);return}
+  toast(v?ids.length+" confirmado"+(ids.length>1?"s":"")+" — passou"+(ids.length>1?"ram":"")+" para «Confirmados»":ids.length+" voltou a «A tratar»");
+  ids.forEach(id=>sel.delete(id));await load();selUpd();
+}
+function renderTabs(){
+  const n=items.length,c=items.filter(i=>i.conf).length;
+  $("tabs").innerHTML=[["pend","⚠ A tratar",n-c],["conf","✔ Confirmados",c],["all","Todos",n]].map(([k,l,x])=>`<span class="chip ${tab===k?"on":""}" data-t="${k}">${l}<span class="c">${x}</span></span>`).join("");
+}
+$("tabs").onclick=e=>{const t=e.target.closest("[data-t]");if(!t)return;tab=t.dataset.t;render()};
+$("bCfSel").onclick=()=>{if(sel.size)setConf([...sel],true)};
+$("bUnSel").onclick=()=>{if(sel.size)setConf([...sel],false)};
 $("bEdSel").onclick=()=>{
   if(!sel.size)return;
   $("bulkN").textContent=sel.size;
@@ -560,7 +577,7 @@ function updDet(){const c=$("categoria").value;DET.forEach(k=>{const w=$("w_"+k)
 $("categoria").addEventListener("change",updDet);
 var openDlg=function(it){
   editing=it||null;$("dT").textContent=it?"Editar subscrição":"Nova subscrição";$("bDel").style.display=it?"":"none";
-  F.forEach(k=>$(k).value=it?(it[k]??""):(k==="period"?"1":k==="iva"?"sim":k==="estado"?"ativo":""));
+  F.forEach(k=>$(k).value=it?(it[k]??""):(k==="period"?"1":k==="iva"?"sim":k==="estado"?"ativo":""));$("conf").checked=!!(it&&it.conf);
   $("dlg").showModal();
 };
 $("bNew").onclick=()=>openDlg();$("bCancel").onclick=()=>$("dlg").close();
@@ -585,8 +602,8 @@ const sb=supabase.createClient(SB_URL,SB_KEY);
 let papel=null,meEmail="",signup=false,chan=null;
 const canEdit=()=>papel==="admin"||papel==="editor";
 const num=v=>v===""||v==null?null:Number(v);
-const fromRow=r=>({id:r.id,categoria:r.categoria,fornecedor:r.fornecedor,servico:r.servico||"",cliente:r.cliente,local:r.localizacao||"",contrato:r.contrato||"",valor:Number(r.valor),period:String(r.periodicidade_meses),iva:r.iva_incluido?"sim":"nao",pag:r.forma_pagamento,origem:r.origem_pagamento,renov:r.data_renovacao,aviso:r.aviso_dias??"",fidel:r.fim_fidelizacao||"",estado:r.estado,notas:r.notas||"",cpe:r.cpe||"",espaco:r.espaco||"",utilizador:r.utilizador||"",acao_pendente:r.acao_pendente||"",potencia:r.potencia_kva??"",tarifa:r.tarifa||"",consumo:r.consumo_medio??"",preco_un:r.preco_unitario??"",subcategoria:r.subcategoria||"",velocidade:r.velocidade||"",canais:r.canais_linhas||"",capital:r.capital_seguro??"",franquia:r.franquia??"",por:r.atualizado_por||r.criado_por});
-const toRow=o=>({categoria:o.categoria,fornecedor:o.fornecedor,servico:o.servico||null,cliente:o.cliente,localizacao:o.local||null,contrato:o.contrato||null,valor:o.valor,periodicidade_meses:Number(o.period),iva_incluido:o.iva==="sim",forma_pagamento:o.pag,origem_pagamento:o.origem,data_renovacao:o.renov,aviso_dias:o.aviso===""?null:Number(o.aviso),fim_fidelizacao:o.fidel||null,estado:o.estado,notas:o.notas||null,cpe:o.cpe||null,espaco:o.espaco||null,utilizador:o.utilizador||null,acao_pendente:o.acao_pendente||null,potencia_kva:num(o.potencia),tarifa:o.tarifa||null,consumo_medio:num(o.consumo),preco_unitario:num(o.preco_un),subcategoria:o.subcategoria||null,velocidade:o.velocidade||null,canais_linhas:o.canais||null,capital_seguro:num(o.capital),franquia:num(o.franquia)});
+const fromRow=r=>({id:r.id,categoria:r.categoria,fornecedor:r.fornecedor,servico:r.servico||"",cliente:r.cliente,local:r.localizacao||"",contrato:r.contrato||"",valor:Number(r.valor),period:String(r.periodicidade_meses),iva:r.iva_incluido?"sim":"nao",pag:r.forma_pagamento,origem:r.origem_pagamento,renov:r.data_renovacao,aviso:r.aviso_dias??"",fidel:r.fim_fidelizacao||"",estado:r.estado,notas:r.notas||"",cpe:r.cpe||"",espaco:r.espaco||"",utilizador:r.utilizador||"",acao_pendente:r.acao_pendente||"",conf:!!r.confirmado,potencia:r.potencia_kva??"",tarifa:r.tarifa||"",consumo:r.consumo_medio??"",preco_un:r.preco_unitario??"",subcategoria:r.subcategoria||"",velocidade:r.velocidade||"",canais:r.canais_linhas||"",capital:r.capital_seguro??"",franquia:r.franquia??"",por:r.atualizado_por||r.criado_por});
+const toRow=o=>({categoria:o.categoria,fornecedor:o.fornecedor,servico:o.servico||null,cliente:o.cliente,localizacao:o.local||null,contrato:o.contrato||null,valor:o.valor,periodicidade_meses:Number(o.period),iva_incluido:o.iva==="sim",forma_pagamento:o.pag,origem_pagamento:o.origem,data_renovacao:o.renov,aviso_dias:o.aviso===""?null:Number(o.aviso),fim_fidelizacao:o.fidel||null,estado:o.estado,notas:o.notas||null,cpe:o.cpe||null,espaco:o.espaco||null,utilizador:o.utilizador||null,acao_pendente:o.acao_pendente||null,confirmado:!!o.conf,confirmado_em:o.conf?new Date().toISOString():null,potencia_kva:num(o.potencia),tarifa:o.tarifa||null,consumo_medio:num(o.consumo),preco_unitario:num(o.preco_un),subcategoria:o.subcategoria||null,velocidade:o.velocidade||null,canais_linhas:o.canais||null,capital_seguro:num(o.capital),franquia:num(o.franquia)});
 
 async function load(){
   const {data,error}=await sb.from("subscricoes").select("*").order("data_renovacao");
@@ -613,7 +630,7 @@ async function remove(id){
 }
 $("frm").onsubmit=async e=>{
   e.preventDefault();
-  const o={};F.forEach(k=>o[k]=$(k).value);o.valor=Number(o.valor);
+  const o={};F.forEach(k=>o[k]=$(k).value);o.conf=$("conf").checked;o.valor=Number(o.valor);
   const isNew=!editing;
   const id=await save(null,o);$("dlg").close();
   if(isNew&&id){const it=items.find(x=>x.id===id);if(it){openDlg(it);toast("Guardado. Já pode anexar faturas e contratos.")}}
